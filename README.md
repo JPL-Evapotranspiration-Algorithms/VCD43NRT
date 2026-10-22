@@ -132,8 +132,8 @@ If NOAA-20/NOAA-21 concept IDs change or are unavailable by default in your envi
 you can override them with environment variables:
 
 ```bash
-export VCD43NRT_JNP09GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
-export VCD43NRT_SNP09GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
+export VCD43NRT_VJ109GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
+export VCD43NRT_VJ209GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
 ```
 
 ## Notes

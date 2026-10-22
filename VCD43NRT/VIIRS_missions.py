@@ -33,16 +33,17 @@ VIIRS_MISSIONS: Dict[str, VIIRSMissionConfig] = {
     "NOAA20": VIIRSMissionConfig(
         key="NOAA20",
         display_name="NOAA-20 (JPSS-1)",
-        short_name="JNP09GA",
-        product_prefix="JNP",
-        concept_id_env="VCD43NRT_JNP09GA_CONCEPT_ID",
+        short_name="VJ109GA",
+        product_prefix="VJ1",
+        concept_id_env="VCD43NRT_VJ109GA_CONCEPT_ID",
+        default_concept_id="C2631841524-LPCLOUD",
     ),
     "NOAA21": VIIRSMissionConfig(
         key="NOAA21",
         display_name="NOAA-21 (JPSS-2)",
-        short_name="SNP09GA",
-        product_prefix="SNP",
-        concept_id_env="VCD43NRT_SNP09GA_CONCEPT_ID",
+        short_name="VJ209GA",
+        product_prefix="VJ2",
+        concept_id_env="VCD43NRT_VJ209GA_CONCEPT_ID",
     ),
 }
 
@@ -66,11 +67,11 @@ MISSION_ALIASES = {
     "N21": "NOAA21",
 }
 
-VIIRS_FILENAME_REGEX = re.compile(r"^(VNP|JNP|SNP)09GA\.[^.]+\.([^.]+)\.\d{3}\.\d+\.h5$")
+VIIRS_FILENAME_REGEX = re.compile(r"^(VNP|VJ1|VJ2)09GA\.[^.]+\.([^.]+)\.\d{3}\.\d+\.h5$")
 PREFIX_TO_MISSION = {
     "VNP": "SNPP",
-    "JNP": "NOAA20",
-    "SNP": "NOAA21",
+    "VJ1": "NOAA20",
+    "VJ2": "NOAA21",
 }
 
 

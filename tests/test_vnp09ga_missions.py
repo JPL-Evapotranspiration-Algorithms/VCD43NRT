@@ -37,8 +37,8 @@ def test_default_mission_priority_behavior():
 
 def test_filename_parsing_for_supported_prefixes():
     snpp_name = "VNP09GA.A2026283.h08v05.002.2026284000000.h5"
-    n20_name = "JNP09GA.A2026283.h08v05.002.2026284000000.h5"
-    n21_name = "SNP09GA.A2026283.h08v05.002.2026284000000.h5"
+    n20_name = "VJ109GA.A2026283.h08v05.002.2026284000000.h5"
+    n21_name = "VJ209GA.A2026283.h08v05.002.2026284000000.h5"
 
     assert modland_tile_from_filename(snpp_name) == "h08v05"
     assert mission_from_filename(snpp_name) == "SNPP"
@@ -52,8 +52,8 @@ def test_mission_registry_contains_required_entries():
     assert "NOAA21" in VIIRS_MISSIONS
 
     assert VIIRS_MISSIONS["SNPP"].short_name == "VNP09GA"
-    assert VIIRS_MISSIONS["NOAA20"].short_name == "JNP09GA"
-    assert VIIRS_MISSIONS["NOAA21"].short_name == "SNP09GA"
+    assert VIIRS_MISSIONS["NOAA20"].short_name == "VJ109GA"
+    assert VIIRS_MISSIONS["NOAA21"].short_name == "VJ209GA"
 
 
 def test_viirs_class_hierarchy():
