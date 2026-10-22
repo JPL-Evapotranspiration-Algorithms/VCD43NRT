@@ -14,6 +14,12 @@ from VCD43NRT.VJ109GA import VJ109GA
 from VCD43NRT.VJ109GA_granule import VJ109GAGranule
 from VCD43NRT.VJ209GA import VJ209GA
 from VCD43NRT.VJ209GA_granule import VJ209GAGranule
+from VCD43NRT.constants import WORKING_DIRECTORY
+
+
+def test_default_working_directory_uses_central_constant():
+    assert VIIRS.DEFAULT_WORKING_DIRECTORY == WORKING_DIRECTORY
+    assert VNP09GA.DEFAULT_WORKING_DIRECTORY == WORKING_DIRECTORY
 
 
 def test_normalize_mission_aliases():

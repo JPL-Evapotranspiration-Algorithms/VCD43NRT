@@ -11,7 +11,7 @@ import pandas as pd
 from dateutil import parser
 from rasters import Point, Polygon, RasterGeometry
 
-from .constants import RETRIES
+from .constants import RETRIES, WORKING_DIRECTORY
 from .VIIRS_missions import (
     DEFAULT_MISSION,
     VIIRS_MISSIONS,
@@ -43,7 +43,7 @@ class VIIRSUnavailableError(Exception):
 
 
 class VIIRS:
-    DEFAULT_WORKING_DIRECTORY = "."
+    DEFAULT_WORKING_DIRECTORY = WORKING_DIRECTORY
     DEFAULT_DOWNLOAD_DIRECTORY = "VIIRS_download"
     DEFAULT_PRODUCTS_DIRECTORY = "VIIRS_products"
     DEFAULT_MOSAIC_DIRECTORY = "VIIRS_mosaics"
