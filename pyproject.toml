@@ -54,3 +54,6 @@ exclude = []
 
 [project.urls]
 Homepage = "https://github.com/"
+
+[project.scripts]
+VNP09GA = "VCD43NRT.VNP09GA:main"
