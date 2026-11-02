@@ -1,0 +1,13 @@
+[package]
+name = "vcd43nrt-brdf"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "_brdf_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+ndarray = "0.16"
+numpy = "0.23"
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py311"] }

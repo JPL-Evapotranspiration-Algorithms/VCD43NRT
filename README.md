@@ -1,10 +1,10 @@
 # VCD43NRT
 
-VCD43NRT is a minimal Python package for working with near-real-time VIIRS/NRT BRDF, albedo, and NDVI products built around the `VNP43NRT`, `VNP43IA4`, and `VNP43MA3` classes.
+VCD43NRT is a Python package for VIIRS/NRT data access and BRDF, albedo, and NDVI processing. The algorithm is exposed through the `VCD43NRT` processor class; VIIRS source-product APIs such as `VNP09GA`, `VJ109GA`, and `VJ209GA` retain their NASA product names.
 
 The data-access layer supports Suomi NPP plus equivalent JPSS VIIRS products for NOAA-20 and NOAA-21 through mission selection and mission-priority fallback.
 
-This repository intentionally contains only the code required for the VIIRS/NRT support layer: the Python package modules that access VIIRS granules through the Earthaccess/CMR path, the MODIS/VIIRS BRDF and solar geometry helpers, and the embedded Julia project used for the VNP43NRT processing path.
+The package uses Python for VIIRS data access, raster preparation, and output writing, and a Rust BRDF solver exposed through PyO3 for array processing.
 
 The older ECOSTRESS L2T/STARS orchestration code and unrelated product-generation infrastructure have been removed so the package matches the current codebase rather than the earlier full pipeline.
 
@@ -12,7 +12,7 @@ The older ECOSTRESS L2T/STARS orchestration code and unrelated product-generatio
 
 The package provides Python-side support for:
 
-- `VNP43NRT`: near-real-time VIIRS/NRT processing and BRDF correction workflow
+- `VCD43NRT`: near-real-time VIIRS/NRT processing and BRDF correction workflow
 - `VNP43IA4`: VIIRS surface reflectance/albedo product interface
 - `VNP43MA3`: VIIRS albedo product support
 
@@ -22,23 +22,23 @@ It includes the supporting utilities needed to:
 - locate MODLAND tiles and generate grids
 - apply solar geometry and BRDF corrections
 - manage date ranges and timing helpers
-- interface with the embedded Julia implementation in the package-local Julia project
+- run the compiled Rust BRDF solver through a Python extension
 
 ## Package layout
 
-The active package is organized as a flat Python package under `VCD43NRT/` with a separate Julia project at the package root:
+The active package is organized as a Python package with a Rust extension:
 
 - `VCD43NRT/` — Python package modules
-- `VCD43NRT/Project.toml` — Julia project metadata
-- `VCD43NRT/src/` — Julia source tree
-- `VCD43NRT/process_VNP43NRT.jl` — Julia entrypoint used by the Python wrapper
+- `VCD43NRT/VCD43NRT.py` — canonical algorithm API
+- `rust/` — Rust BRDF solver and PyO3 extension
 
 ## Prerequisites
 
 This package needs:
 
 - Python 3.11+
-- Julia installed and available on `PATH`
+- a compatible published wheel for the current Python version and platform (no Julia or Rust toolchain required)
+- the wheel build targets Linux x86_64, macOS x86_64/arm64, and Windows x86_64, using the CPython 3.11 stable ABI
 - an EarthData account for downloading data products
 
 ## Authentication
@@ -53,40 +53,34 @@ password <PASSWORD>
 
 ## Installation
 
-From a clone of this repository:
+Install a published release on a supported Python/platform combination:
+
+```bash
+pip install VCD43NRT
+```
+
+Installing from a source checkout builds the Rust extension and requires a Rust toolchain:
 
 ```bash
 pip install .
 ```
 
-Or install from a local source tree in editable mode during development:
-
-```bash
-pip install -e .
-```
-
-## Julia setup
-
-The package includes a Julia project stored in the package directory. Instantiate the Julia environment before running the Julia-backed processing path:
-
-```bash
-julia --project=VCD43NRT -e 'using Pkg; Pkg.instantiate()'
-```
+The no-toolchain install applies when PyPI has a compatible prebuilt wheel. Unsupported platform/Python combinations and source builds may require Rust.
 
 ## Usage
 
 ```python
-from VCD43NRT import VNP43NRT, VNP43IA4, VNP43MA3
+from VCD43NRT import VCD43NRT, VNP09GA
 ```
 
 The package is designed to be imported as a regular Python module and used from the classes above rather than through the older ECOSTRESS-specific CLI flow.
 
 ### Single-granule test run
 
-Use the helper script below to generate one VNP43NRT granule for a specific tile/date:
+Use the helper script below to generate one VCD43NRT granule for a specific tile/date:
 
 ```bash
-python scripts/generate_single_vnp43nrt_granule.py \
+python examples/generate_single_VCD43NRT_granule.py \
 	--tile h09v05 \
 	--date 2026-10-10 \
 	--working-directory ./scratch/vcd43nrt
@@ -95,7 +89,6 @@ python scripts/generate_single_vnp43nrt_granule.py \
 Optional flags:
 
 - `--diagnostics` to also write diagnostic layers
-- `--initialize-julia` to instantiate the Julia project before processing
 - `--mission NOAA20` (or `NOAA21`) to force a specific JPSS mission
 - `--fallback-mode --mission-priority SNPP,NOAA20,NOAA21` to automatically try missions in order
 
@@ -104,15 +97,15 @@ Optional flags:
 Default behavior is unchanged and uses Suomi NPP only:
 
 ```python
-from VCD43NRT import VNP43NRT
+from VCD43NRT import VCD43NRT
 
-processor = VNP43NRT(working_directory="~/data/VCD43NRT")
+processor = VCD43NRT(working_directory="~/data/VCD43NRT")
 ```
 
 To target one JPSS mission explicitly:
 
 ```python
-processor = VNP43NRT(
+processor = VCD43NRT(
 	working_directory="~/data/VCD43NRT",
 	mission="NOAA20",
 )
@@ -121,7 +114,7 @@ processor = VNP43NRT(
 To enable automatic mission-priority fallback:
 
 ```python
-processor = VNP43NRT(
+processor = VCD43NRT(
 	working_directory="~/data/VCD43NRT",
 	fallback_mode=True,
 	mission_priority=["SNPP", "NOAA20", "NOAA21"],
@@ -138,7 +131,7 @@ export VCD43NRT_VJ209GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
 
 ## Notes
 
-This repository is intentionally reduced to the runtime classes and utilities that support the VIIRS/NRT products. It is not a full ECOSTRESS data-product orchestration repository, and it does not include the older L2T/STARS product-generation pipeline that was removed during the package simplification. The legacy LP-DAAC direct-download pool is no longer part of the default package path; the supported workflow uses Earthaccess/CMR-backed VIIRS granule discovery and download.
+The former `VNP43NRT` processor import and method remain as deprecated compatibility aliases; new code should use `VCD43NRT`. Existing output directory naming is retained to avoid breaking local caches. This repository supports VIIRS products through Earthaccess/CMR-backed granule discovery and download.
 
 ## References
 

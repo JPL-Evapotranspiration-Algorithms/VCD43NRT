@@ -23,6 +23,7 @@ As part of this migration, rebrand the algorithm-facing name from `VNP43NRT` to 
 - Build and validate the Rust extension before removing the Julia implementation so it remains available as a parity reference during development.
 - Preserve `VNP43NRT` when it is a literal NASA product, upstream filename, or data-source identifier; rename only this package's algorithm and processing API.
 - Make `VCD43NRT` the canonical processor/class name and retain a deprecated `VNP43NRT` compatibility alias for at least one transition release unless a breaking release is explicitly intended.
+- Keep existing `VNP43NRT` staging/output directory names and granule IDs so local caches continue to work; expose canonical `VCD43NRT_directory` and `VCD43NRT_staging_directory` parameters and retain old parameter names as deprecated aliases.
 
 ## Current Processing Boundary
 
@@ -45,7 +46,7 @@ Avoid intermediate solver output GeoTIFFs. Preserve staging GeoTIFFs if they rem
 2. Keep the existing distribution and package name `VCD43NRT`; do not rename the Python package or unrelated VIIRS source-product APIs.
 3. Keep `VNP09GA`, `VJ109GA`, and other names that identify actual NASA/VIIRS products unchanged. Likewise, preserve upstream product IDs and filenames wherever they refer to source data rather than this algorithm's own API or generated outputs.
 4. Provide a deprecated `VNP43NRT` import/class alias that forwards to the canonical `VCD43NRT` implementation for at least one transition release. Emit a standard deprecation warning at the old public entry point and document its planned removal; if the migration is intentionally released as a breaking change, document that instead.
-5. Decide whether generated output directory names, granule identifiers, and filenames are algorithm-branded or externally consumed product identifiers. Rename only algorithm-owned names, and support or document migration from existing `VNP43NRT` output paths.
+5. Preserve existing `VNP43NRT` output directory names and granule IDs for local-cache compatibility. Use canonical `VCD43NRT` names for new constructor parameters and retain old names as deprecated aliases.
 6. Search and update in-repository imports, exports, entry points, class names, examples, test names, and docs consistently; avoid blind text replacement of source-product references.
 
 ### Phase 2: Define the behavioral and array contract
@@ -89,11 +90,11 @@ Avoid intermediate solver output GeoTIFFs. Preserve staging GeoTIFFs if they rem
 
 1. Change the build backend in `pyproject.toml` to maturin and configure the Python package/module name, Rust crate path, and extension-module settings.
 2. Keep Python runtime dependencies in project metadata; remove Julia project files from package data and release instructions.
-3. Build wheels in CI for each supported Python ABI and platform/architecture combination. Select the matrix based on the project's intended support policy, including Linux (manylinux), macOS (Intel and Apple Silicon as applicable), and Windows if supported.
+3. Build `abi3` wheels for CPython 3.11+ in CI for Linux x86_64 (manylinux), macOS x86_64 and arm64, and Windows x86_64. Add another target only when the dependency stack is supported and the wheel is covered by CI.
 4. Use a maintained wheel-building workflow (for example, maturin's GitHub Action) and test each built wheel in a clean environment with no Rust or Julia installed.
 5. Build and test a source distribution as well. Document that source installs may need Rust and that the no-toolchain installation guarantee applies to platforms with published compatible wheels.
 6. Publish release wheels and source distributions to PyPI, preferably through GitHub Actions trusted publishing, and verify that PyPI contains all expected artifacts before announcing a release.
-7. Test actual `pip install VCD43NRT` resolution for representative supported Python/platform combinations, confirming pip selects a wheel rather than attempting a local Rust build.
+7. Test actual wheel installation and extension import on Python 3.11, 3.12, and 3.13 for every supported target, confirming pip selects a wheel rather than attempting a local Rust build.
 
 ### Phase 7: Remove Julia and update user documentation
 
@@ -142,7 +143,7 @@ Avoid intermediate solver output GeoTIFFs. Preserve staging GeoTIFFs if they rem
 - **Source builds requiring Rust:** make the wheel-based installation guarantee explicit and publish wheels before recommending the new release.
 - **Changing public API by removing `initialize_julia`:** search all callers and examples, remove the option consistently, and call out any compatibility impact in release notes.
 - **Algorithm rebranding colliding with source-product terminology:** distinguish algorithm-owned API/output names from literal NASA product identifiers and only rename the former.
-- **Breaking existing imports or output paths:** retain a deprecated `VNP43NRT` alias through a transition release and provide migration guidance for algorithm-owned output paths.
+- **Breaking existing imports or output paths:** retain a deprecated `VNP43NRT` alias through a transition release and preserve existing cache/output paths.
 
 ## Out of Scope
 

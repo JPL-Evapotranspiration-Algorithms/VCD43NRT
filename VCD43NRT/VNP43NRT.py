@@ -2,13 +2,12 @@ import argparse
 import json
 import logging
 import shutil
-import subprocess
 import sys
 from datetime import date, timedelta, datetime
 from glob import glob
 from os.path import abspath, expanduser, join, basename, splitext, exists, dirname
-import os
 from typing import Optional, Sequence, Union, List
+import warnings
 import dateutil
 import numpy as np
 from dateutil import parser
@@ -25,6 +24,7 @@ except ImportError:  # pragma: no cover - legacy direct-import fallback
 from modland import find_modland_tiles, parsehv, generate_modland_grid
 
 try:
+    from ._brdf_rust import nrt_brdf_all
     from .BRDF import bidirectional_reflectance
     from .SZA import calculate_SZA
     from .VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI
@@ -35,6 +35,7 @@ try:
     from .daterange import date_range
     from .timer import Timer
 except ImportError:  # pragma: no cover - legacy direct-import fallback
+    from _brdf_rust import nrt_brdf_all
     from BRDF import bidirectional_reflectance
     from SZA import calculate_SZA
     from VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI
@@ -52,121 +53,6 @@ with open(join(abspath(dirname(__file__)), "version.txt")) as f:
     version = f.read()
 
 logger = logging.getLogger(__name__)
-
-def install_VNP43NRT_jl(
-    package_location: str = "https://github.com/STARS-Data-Fusion/VNP43NRT.jl",
-    environment_name: str = "@VCD43NRT"):
-    """
-    Installs the VNP43NRT.jl package from GitHub into a shared environment.
-
-    Args:
-        github_url: The URL of the GitHub repository containing VNP43NRT.jl.
-            Defaults to "https://github.com/STARS-Data-Fusion/VNP43NRT.jl".
-        environment_name: The name of the shared Julia environment to install the
-            package into. Defaults to "@VCD43NRT".
-
-    Returns:
-        A CompletedProcess object containing information about the execution of the Julia command.
-    """
-
-    julia_command = [
-        "julia",
-        "-e",
-        f'using Pkg; Pkg.activate("{environment_name}"); Pkg.develop(url="{package_location}")'
-    ]
-
-    result = subprocess.run(julia_command, capture_output=True, text=True)
-
-    if result.returncode == 0:
-        logger.info(f"VNP43NRT.jl installed successfully in environment '{environment_name}'!")
-    else:
-        logger.error("Error installing VNP43NRT.jl:")
-        logger.error(result.stderr)
-
-    return result
-
-def instantiate_VNP43NRT_jl(package_location: str):
-    """
-    Activates the package_location directory as the active project and instantiates it.
-
-    Args:
-        package_location: The directory of the Julia package to activate and instantiate.
-
-    Returns:
-        A CompletedProcess object containing information about the execution of the Julia command.
-    """
-
-    julia_command = [
-        "julia",
-        "-e",
-        f'using Pkg; Pkg.activate("{package_location}"); Pkg.instantiate()'
-    ]
-
-    result = subprocess.run(julia_command, capture_output=True, text=True)
-
-    if result.returncode == 0:
-        logger.info(f"VNP43NRT.jl instantiated successfully in directory '{package_location}'!")
-    else:
-        logger.error("Error instantiating VNP43NRT.jl:")
-        logger.error(result.stderr)
-
-    return result
-
-def process_julia_BRDF(
-        band: str,
-        h: int,
-        v: int,
-        tile_width_cells: int,
-        start_date: date,
-        end_date: date,
-        reflectance_directory: str,
-        solar_zenith_directory: str,
-        sensor_zenith_directory: str,
-        relative_azimuth_directory: str,
-        SZA_filename: str,
-        output_directory: str,
-        initialize_julia: bool,
-        threads: Union[int, str] = "auto"):
-    parent_directory = abspath(dirname(__file__))
-    julia_source_directory = parent_directory
-    julia_script_filename = join(parent_directory, "process_VNP43NRT.jl")
-
-    if initialize_julia:
-        instantiate_VNP43NRT_jl(julia_source_directory)
-
-    # Set up the environment for the julia script
-    # IMPORTANT: Create a COPY of os.environ to avoid modifying system-level environment variables.
-    # This ensures that we only modify the environment for this subprocess call,
-    # preserving the system-level GDAL configuration for other parts of the application.
-    julia_env = os.environ.copy()
-    julia_env["JULIA_NUM_THREADS"] = str(threads)
-    # Ensure that Julia uses its bundled libraries instead of incompatible
-    # Homebrew/conda overrides that can break libjulia/libLLVM loading on macOS.
-    for key in [
-        "GDAL_DATA",
-        "GDAL_DRIVER_PATH",
-        "DYLD_LIBRARY_PATH",
-        "DYLD_FALLBACK_LIBRARY_PATH",
-        "LD_LIBRARY_PATH",
-    ]:
-        julia_env.pop(key, None)
-
-    command = [
-        "julia", f"--project={julia_source_directory}", julia_script_filename,
-        band,
-        f"{h}", f"{v}",
-        f"{tile_width_cells}",
-        f"{start_date:%Y-%m-%d}", f"{end_date:%Y-%m-%d}",
-        reflectance_directory,
-        solar_zenith_directory,
-        sensor_zenith_directory,
-        relative_azimuth_directory,
-        SZA_filename,
-        output_directory,
-    ]
-
-    logger.info(" ".join(command))
-    subprocess.run(command, check=False, env=julia_env)
 
 class BRDFRetrievalFailed(RuntimeError):
     pass
@@ -201,12 +87,29 @@ class BRDFParameters:
         self.count = count
 
 
-class VNP43NRTGranule:
+def _read_brdf_stack(directory: str, dates: Sequence[date], variable: str, shape: tuple[int, ...]) -> np.ndarray:
+    expected_pixels = int(np.prod(shape))
+    stack = np.empty((expected_pixels, len(dates)), dtype=np.float64)
+    for column, processing_date in enumerate(dates):
+        filename = join(directory, f"{processing_date:%Y-%m-%d}_{variable}.tif")
+        if not exists(filename):
+            raise FileNotFoundError(f"missing staged {variable} raster for {processing_date}: {filename}")
+        values = np.asarray(Raster.open(filename), dtype=np.float64)
+        if values.shape != shape:
+            raise ValueError(
+                f"staged {variable} raster for {processing_date} has shape {values.shape}; expected {shape}"
+            )
+        stack[:, column] = values.reshape(expected_pixels)
+
+    return stack
+
+
+class VCD43NRTGranule:
     def __init__(self, directory: str):
         self._directory = abspath(directory)
 
     def __repr__(self):
-        return f"VNP43NRTGranule({self.directory})"
+        return f"VCD43NRTGranule({self.directory})"
 
     @property
     def directory(self):
@@ -271,10 +174,10 @@ class VNP43NRTGranule:
 
     def add_layer(self, variable_name: str, image: Raster) -> str:
         if not isinstance(image, Raster):
-            raise TypeError(f"VNP43NRT layer '{variable_name}' must be a rasters.Raster, got {type(image).__name__}")
+            raise TypeError(f"VCD43NRT layer '{variable_name}' must be a rasters.Raster, got {type(image).__name__}")
 
         filename = self.variable_filename(variable_name)
-        logger.info(f"adding VNP43NRT layer at {cl.place(self.tile)} on {cl.time(self.date_UTC)}: {cl.file(filename)}")
+        logger.info(f"adding VCD43NRT layer at {cl.place(self.tile)} on {cl.time(self.date_UTC)}: {cl.file(filename)}")
         image.to_COG(filename)
 
         return filename
@@ -305,9 +208,10 @@ class AuxiliaryDownloadFailed(ConnectionError):
     pass
 
 
-class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
+class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
     DEFAULT_VNP09GA_DIRECTORY = "VNP09GA_products"
-    DEFAULT_VNP43NRT_DIRECTORY = "VNP43NRT_products"
+    DEFAULT_VCD43NRT_DIRECTORY = "VNP43NRT_products"
+    DEFAULT_VNP43NRT_DIRECTORY = DEFAULT_VCD43NRT_DIRECTORY
 
     def __init__(
             self,
@@ -322,24 +226,48 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             mission: str = "SNPP",
             mission_priority: Optional[Sequence[str]] = None,
             fallback_mode: bool = False,
-            initialize_julia: bool = False):
+            VCD43NRT_directory: str = None,
+            VCD43NRT_staging_directory: str = None):
+        if VCD43NRT_directory is not None and VNP43NRT_directory is not None:
+            raise ValueError("specify only one of VCD43NRT_directory and VNP43NRT_directory")
+        if VCD43NRT_staging_directory is not None and VNP43NRT_staging_directory is not None:
+            raise ValueError(
+                "specify only one of VCD43NRT_staging_directory and VNP43NRT_staging_directory"
+            )
+        if VNP43NRT_directory is not None:
+            warnings.warn(
+                "VNP43NRT_directory is deprecated; use VCD43NRT_directory.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if VNP43NRT_staging_directory is not None:
+            warnings.warn(
+                "VNP43NRT_staging_directory is deprecated; use VCD43NRT_staging_directory.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if working_directory is None:
             working_directory = VNP09GA.DEFAULT_WORKING_DIRECTORY
 
         working_directory = abspath(expanduser(working_directory))
 
-        if VNP43NRT_staging_directory is None:
-            VNP43NRT_staging_directory = join(working_directory, "VNP43NRT_staging")
+        if VCD43NRT_staging_directory is None:
+            VCD43NRT_staging_directory = VNP43NRT_staging_directory
+        if VCD43NRT_staging_directory is None:
+            VCD43NRT_staging_directory = join(working_directory, "VNP43NRT_staging")
 
         if VNP09GA_directory is None:
             VNP09GA_directory = join(working_directory, self.DEFAULT_VNP09GA_DIRECTORY)
 
         VNP09GA_directory = abspath(expanduser(VNP09GA_directory))
 
-        if VNP43NRT_directory is None:
-            VNP43NRT_directory = join(working_directory, self.DEFAULT_VNP43NRT_DIRECTORY)
+        if VCD43NRT_directory is None:
+            VCD43NRT_directory = VNP43NRT_directory
+        if VCD43NRT_directory is None:
+            VCD43NRT_directory = join(working_directory, self.DEFAULT_VCD43NRT_DIRECTORY)
 
-        VNP43NRT_directory = abspath(expanduser(VNP43NRT_directory))
+        VCD43NRT_directory = abspath(expanduser(VCD43NRT_directory))
+        VCD43NRT_staging_directory = abspath(expanduser(VCD43NRT_staging_directory))
 
         self.vnp09ga = VNP09GA(
             working_directory=working_directory,
@@ -357,19 +285,20 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             )
 
         self.VNP09GA_directory = VNP09GA_directory
-        self.VNP43NRT_directory = VNP43NRT_directory
+        self.VCD43NRT_directory = VCD43NRT_directory
+        self.VNP43NRT_directory = self.VCD43NRT_directory
         self.GEOS5FP = GEOS5FP_connection
-        self.VNP43NRT_staging_directory = VNP43NRT_staging_directory
+        self.VCD43NRT_staging_directory = VCD43NRT_staging_directory
+        self.VNP43NRT_staging_directory = self.VCD43NRT_staging_directory
         self.mission = self.vnp09ga.mission
         self.mission_priority = self.vnp09ga.mission_priority
         self.fallback_mode = self.vnp09ga.fallback_mode
-        self.initialize_julia = initialize_julia
 
     def __repr__(self):
         display_dict = {
             "download_directory": self.vnp09ga.download_directory,
             "VNP09GA_directory": self.VNP09GA_directory,
-            "VNP43NRT_directory": self.VNP43NRT_directory,
+            "VCD43NRT_directory": self.VCD43NRT_directory,
             "mosaic_directory": self.vnp09ga.mosaic_directory
         }
 
@@ -398,7 +327,7 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         )
 
     def generate_staging_directory(self, tile: str, variable: str) -> str:
-        return join(self.VNP43NRT_staging_directory, tile, variable)
+        return join(self.VCD43NRT_staging_directory, tile, variable)
 
     def generate_staging_filename(self, tile: str, processing_date, variable: str) -> str:
         return join(self.generate_staging_directory(tile, variable), f"{processing_date:%Y-%m-%d}_{variable}.tif")
@@ -408,8 +337,6 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             date_UTC: Union[date, str],
             tile: str,
             band: str):
-        DTYPE = np.float64
-
         if isinstance(date_UTC, str):
             date_UTC = parser.parse(date_UTC).date()
 
@@ -432,18 +359,13 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
 
         grid = generate_modland_grid(h, v, tile_width_cells)
 
-        # reflectance_list = []
-        # solar_zenith_list = []
-        # sensor_zenith_list = []
-        # relative_azimuth_list = []
-
         granule = self.VNP09GA(date_UTC, tile)
         geometry = granule.geometry(band)
+        observation_dates = []
 
         for processing_date in date_range(start_date, end_date):
-            logger.info(f"retrieving VNP09GA for VNP43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
+            logger.info(f"retrieving VNP09GA for VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
 
-            # TODO replace the lists with directories of GeoTIFFs staged for VNP43NRT_jl
             try:
                 granule = self.VNP09GA(processing_date, tile)
 
@@ -451,55 +373,44 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
 
                 if exists(reflectance_filename):
                     logger.info(f"previously generated {band} reflectance on {processing_date}: {reflectance_filename}")
-                    # reflectance_raster = Raster.open(reflectance_filename)
                 else:
                     logger.info(f"generating {band} reflectance on {processing_date}")
                     reflectance_raster = granule.band(band)
                     logger.info(f"writing {band} reflectance on {processing_date}: {reflectance_filename}")
                     reflectance_raster.to_geotiff(reflectance_filename)
 
-                # reflectance_list.append(np.array(reflectance_raster).flatten())
-
                 solar_zenith_filename = self.generate_staging_filename(tile, processing_date, f"{band_type}_solar_zenith")
 
                 if exists(solar_zenith_filename):
                     logger.info(f"previously generated solar zenith on {processing_date}: {solar_zenith_filename}")
-                    # solar_zenith_raster = Raster.open(solar_zenith_filename)
                 else:
                     logger.info(f"generating solar zenith on {processing_date}")
                     solar_zenith_raster = granule.solar_zenith(band)
                     logger.info(f"writing solar zenith on {processing_date}: {solar_zenith_filename}")
                     solar_zenith_raster.to_geotiff(solar_zenith_filename)
 
-                # solar_zenith_list.append(np.array(solar_zenith_raster).flatten())
-
                 sensor_zenith_filename = self.generate_staging_filename(tile, processing_date, f"{band_type}_sensor_zenith")
 
                 if exists(sensor_zenith_filename):
                     logger.info(f"previously generated sensor zenith on {processing_date}: {sensor_zenith_filename}")
-                    # sensor_zenith_raster = Raster.open(sensor_zenith_filename)
                 else:
                     logger.info(f"generating sensor zenith on {processing_date}")
                     sensor_zenith_raster = granule.sensor_zenith(band)
                     logger.info(f"writing sensor zenith on {processing_date}: {sensor_zenith_filename}")
                     sensor_zenith_raster.to_geotiff(sensor_zenith_filename)
 
-                # sensor_zenith_list.append(np.array(sensor_zenith_raster).flatten())
-
                 relative_azimuth_filename = self.generate_staging_filename(tile, processing_date, f"{band_type}_relative_azimuth")
 
                 if exists(relative_azimuth_filename):
-                    logger.info(f"previously generated sensor zenith on {processing_date}: {relative_azimuth_filename}")
-                    # relative_azimuth_raster = Raster.open(relative_azimuth_filename)
+                    logger.info(f"previously generated relative azimuth on {processing_date}: {relative_azimuth_filename}")
                 else:
-                    logger.info(f"generating sensor zenith on {processing_date}")
+                    logger.info(f"generating relative azimuth on {processing_date}")
                     solar_azimuth = granule.solar_azimuth(band)
                     sensor_azimuth = granule.sensor_azimuth(band)
                     relative_azimuth_raster = Raster(np.abs(solar_azimuth - sensor_azimuth), geometry=sensor_azimuth.geometry)
-                    logger.info(f"writing sensor zenith on {processing_date}: {relative_azimuth_filename}")
+                    logger.info(f"writing relative azimuth on {processing_date}: {relative_azimuth_filename}")
                     relative_azimuth_raster.to_geotiff(relative_azimuth_filename)
 
-                # relative_azimuth_list.append(np.array(relative_azimuth_raster).flatten())
             except VIIRSUnavailableError as e:
                 if (datetime.utcnow().date() - processing_date).days > 4:
                     logger.warning(e)
@@ -507,12 +418,8 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
                 else:
                     raise e
 
-        # Y = np.stack(reflectance_list).T.astype(DTYPE)
-        # sz = np.stack(solar_zenith_list).T.astype(DTYPE)
-        # vz = np.stack(sensor_zenith_list).T.astype(DTYPE)
-        # rz = np.stack(relative_azimuth_list).T.astype(DTYPE)
+            observation_dates.append(processing_date)
 
-        # SZA_filename = self.generate_SZA_filename(date_UTC, band_type)
         SZA_filename = self.generate_staging_filename(tile, date_UTC, f"{band_type}_solar_zenith_noon")
 
         if exists(SZA_filename):
@@ -523,94 +430,56 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             logger.info(f"writing solar zenith noon: {SZA_filename}")
             SZA.to_geotiff(SZA_filename)
 
-        # soz_noon = np.array(SZA).flatten()
-
-        logger.info(f"started processing VNP43NRT BRDF parameters at {cl.place(tile)} on {cl.time(date_UTC)}")
+        logger.info(f"started processing VCD43NRT BRDF parameters at {cl.place(tile)} on {cl.time(date_UTC)}")
         timer = Timer()
+        if not observation_dates:
+            raise BRDFRetrievalFailed(f"no reflectance/angle observations available for {tile} on {date_UTC}")
 
-        # TODO replace this with call to VNP43NRT_jl
-        try:
-            # cpp_results = NRT_BRDF_all(
-            #     Y=Y,
-            #     sz=sz,
-            #     vz=vz,
-            #     rz=rz,
-            #     soz_noon=soz_noon
-            # )
-            reflectance_directory = self.generate_staging_directory(tile, band)
-            solar_zenith_directory = self.generate_staging_directory(tile, f"{band_type}_solar_zenith")
-            sensor_zenith_directory = self.generate_staging_directory(tile, f"{band_type}_sensor_zenith")
-            relative_azimuth_directory = self.generate_staging_directory(tile, f"{band_type}_relative_azimuth")
-            output_directory = self.generate_staging_directory(tile, "output")
-
-            process_julia_BRDF(
-                band=band,
-                h=h,
-                v=v,
-                tile_width_cells=tile_width_cells,
-                start_date=start_date,
-                end_date=end_date,
-                reflectance_directory=reflectance_directory,
-                solar_zenith_directory=solar_zenith_directory,
-                sensor_zenith_directory=sensor_zenith_directory,
-                relative_azimuth_directory=relative_azimuth_directory,
-                SZA_filename=SZA_filename,
-                output_directory=output_directory,
-                initialize_julia=self.initialize_julia,
+        shape = geometry.shape
+        reflectance_directory = self.generate_staging_directory(tile, band)
+        solar_zenith_directory = self.generate_staging_directory(tile, f"{band_type}_solar_zenith")
+        sensor_zenith_directory = self.generate_staging_directory(tile, f"{band_type}_sensor_zenith")
+        relative_azimuth_directory = self.generate_staging_directory(tile, f"{band_type}_relative_azimuth")
+        Y = _read_brdf_stack(reflectance_directory, observation_dates, band, shape)
+        sz = _read_brdf_stack(solar_zenith_directory, observation_dates, f"{band_type}_solar_zenith", shape)
+        vz = _read_brdf_stack(sensor_zenith_directory, observation_dates, f"{band_type}_sensor_zenith", shape)
+        rz = _read_brdf_stack(relative_azimuth_directory, observation_dates, f"{band_type}_relative_azimuth", shape)
+        solar_noon_raster = Raster.open(SZA_filename)
+        if solar_noon_raster.shape != shape:
+            raise ValueError(
+                f"solar-noon raster has shape {solar_noon_raster.shape}; expected {shape}"
             )
-
-            WSA = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_WSA.tif"))
-            BSA = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_BSA.tif"))
-            NBAR = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_NBAR.tif"))
-            WSA_SE = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_WSA_SE.tif"))
-            BSA_SE = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_BSA_SE.tif"))
-            NBAR_SE = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_NBAR_SE.tif"))
-            BRDF_SE = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_BRDF_SE.tif"))
-            BRDF_R2 = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_BRDF_R2.tif"))
-            count = Raster.open(join(output_directory, f"{date_UTC:%Y-%m-%d}_count.tif"))
-
-            logger.info(f"removing output directory: {output_directory}")
-            shutil.rmtree(output_directory)
-        except RuntimeError as e:
-            logger.exception(e)
-            # raise BRDFRetrievalFailed(f"BRDF retrival failed for {cl.place(tile)} on {cl.time(date_UTC)} ({cl.time(timer)})")
-            WSA = Raster(np.full(geometry.shape, 0.55, np.float32), geometry=geometry)
-            BSA = Raster(np.full(geometry.shape, 0.45, np.float32), geometry=geometry)
-            NBAR = Raster(np.full(geometry.shape, 0.50, np.float32), geometry=geometry)
-            WSA_SE = Raster(np.full(geometry.shape, 0.25, np.float32), geometry=geometry)
-            BSA_SE = Raster(np.full(geometry.shape, 0.20, np.float32), geometry=geometry)
-            NBAR_SE = Raster(np.full(geometry.shape, 0.30, np.float32), geometry=geometry)
-            BRDF_SE = Raster(np.full(geometry.shape, 0.15, np.float32), geometry=geometry)
-            BRDF_R2 = Raster(np.full(geometry.shape, 0.80, np.float32), geometry=geometry)
-            count = Raster(np.full(geometry.shape, 1.0, np.float32), geometry=geometry)
-
-            BRDF_parameters = BRDFParameters(
-                WSA=WSA,
-                BSA=BSA,
-                NBAR=NBAR,
-                NBAR_SE=NBAR_SE,
-                WSA_SE=WSA_SE,
-                BSA_SE=BSA_SE,
-                BRDF_SE=BRDF_SE,
-                BRDF_R2=BRDF_R2,
-                count=count
-            )
-
-            return BRDF_parameters
+        solar_noon = np.ascontiguousarray(
+            np.asarray(solar_noon_raster, dtype=np.float64).reshape(-1)
+        )
+        results = nrt_brdf_all(
+            Y,
+            sz,
+            vz,
+            rz,
+            solar_noon,
+            weighted=DEFAULT_WEIGHTED,
+            scale=DEFAULT_SCALE,
+        )
+        output_layers = [
+            "WSA", "BSA", "NBAR", "WSA_SE", "BSA_SE", "NBAR_SE", "BRDF_SE", "BRDF_R2", "count"
+        ]
+        rasters_by_name = {
+            name: Raster(np.asarray(results[:, index].reshape(shape), dtype=np.float32), geometry=geometry)
+            for index, name in enumerate(output_layers)
+        }
+        WSA = rasters_by_name["WSA"]
+        BSA = rasters_by_name["BSA"]
+        NBAR = rasters_by_name["NBAR"]
+        WSA_SE = rasters_by_name["WSA_SE"]
+        BSA_SE = rasters_by_name["BSA_SE"]
+        NBAR_SE = rasters_by_name["NBAR_SE"]
+        BRDF_SE = rasters_by_name["BRDF_SE"]
+        BRDF_R2 = rasters_by_name["BRDF_R2"]
+        count = rasters_by_name["count"]
 
         logger.info(
-            f"finished processing VNP43NRT BRDF parameters at {cl.place(tile)} on {cl.time(date_UTC)} ({cl.time(timer)})")
-
-        # TODO replace this with loading the GeoTIFFs written by VNP43NRT_jl
-        # WSA = Raster(cpp_results[:, 0].reshape(geometry.shape), geometry=geometry)
-        # BSA = Raster(cpp_results[:, 1].reshape(geometry.shape), geometry=geometry)
-        # NBAR = Raster(cpp_results[:, 2].reshape(geometry.shape), geometry=geometry)
-        # WSA_SE = Raster(cpp_results[:, 3].reshape(geometry.shape), geometry=geometry)
-        # BSA_SE = Raster(cpp_results[:, 4].reshape(geometry.shape), geometry=geometry)
-        # NBAR_SE = Raster(cpp_results[:, 5].reshape(geometry.shape), geometry=geometry)
-        # BRDF_SE = Raster(cpp_results[:, 6].reshape(geometry.shape), geometry=geometry)
-        # BRDF_R2 = Raster(cpp_results[:, 7].reshape(geometry.shape), geometry=geometry)
-        # count = Raster(cpp_results[:, 8].reshape(geometry.shape), geometry=geometry)
+            f"finished processing VCD43NRT BRDF parameters at {cl.place(tile)} on {cl.time(date_UTC)} ({cl.time(timer)})")
 
         BRDF_parameters = BRDFParameters(
             WSA=WSA,
@@ -623,9 +492,6 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             BRDF_R2=BRDF_R2,
             count=count
         )
-
-        # logger.info(f"removing staging_directory: {self.VNP43NRT_staging_directory}")
-        # shutil.rmtree(self.VNP43NRT_staging_directory, ignore_errors=True)
 
         return BRDF_parameters
 
@@ -649,23 +515,23 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             self,
             date_UTC: Union[date, str],
             tile: str) -> str:
-        return join(self.VNP43NRT_directory, self.granule_ID(date_UTC, tile))
+        return join(self.VCD43NRT_directory, self.granule_ID(date_UTC, tile))
 
     def AOT(self, time_UTC: datetime, geometry: RasterGeometry = None, resampling: str = None) -> Raster:
         try:
             return self.GEOS5FP.AOT(time_UTC=time_UTC, geometry=geometry, resampling=resampling)
         except FailedGEOS5FPDownload as e:
-            raise AuxiliaryDownloadFailed("unable to retrieve AOT from GEOS5-FP for VNP43NRT")
+            raise AuxiliaryDownloadFailed("unable to retrieve AOT from GEOS5-FP for VCD43NRT") from e
 
-    def VNP43NRT(
+    def VCD43NRT(
             self,
             date_UTC: Union[date, str],
             tile: str,
-            diagnostics: bool = False) -> VNP43NRTGranule:
+            diagnostics: bool = False) -> VCD43NRTGranule:
         if isinstance(date_UTC, str):
             date_UTC = parser.parse(date_UTC).date()
 
-        logger.info(f"started processing VNP43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
+        logger.info(f"started processing VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
         timer = Timer()
 
         directory = self.granule_directory(
@@ -673,10 +539,10 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             tile=tile
         )
 
-        granule = VNP43NRTGranule(directory)
+        granule = VCD43NRTGranule(directory)
 
         if exists(directory):
-            logger.warning(f"removing stale VNP43NRT granule output directory before regeneration: {directory}")
+            logger.warning(f"removing stale VCD43NRT granule output directory before regeneration: {directory}")
             shutil.rmtree(directory, ignore_errors=True)
 
         if granule.complete:
@@ -761,15 +627,27 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
 
         albedo = Raster(rasters.clip(albedo, 0, 1), geometry=b[1].geometry)
         granule.add_layer("albedo", albedo)
-        logger.info(f"finished processing VNP43NRT at {cl.place(tile)} on {cl.time(date_UTC)} ({cl.time(timer)})")
+        logger.info(f"finished processing VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)} ({cl.time(timer)})")
 
         return granule
+
+    def VNP43NRT(
+            self,
+            date_UTC: Union[date, str],
+            tile: str,
+            diagnostics: bool = False) -> VCD43NRTGranule:
+        warnings.warn(
+            "VNP43NRT is deprecated; use VCD43NRT instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.VCD43NRT(date_UTC=date_UTC, tile=tile, diagnostics=diagnostics)
 
     def granule(
             self,
             date_UTC: Union[date, str],
-            tile: str) -> VNP43NRTGranule:
-        return self.VNP43NRT(
+            tile: str) -> VCD43NRTGranule:
+        return self.VCD43NRT(
             date_UTC=date_UTC,
             tile=tile
         )
@@ -857,10 +735,23 @@ class VNP43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         return NDVI
 
 
+VNP43NRTGranule = VCD43NRTGranule
+
+
+class VNP43NRT(VCD43NRT):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "VNP43NRT is deprecated; use VCD43NRT instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
+
+
 def main(argv=sys.argv):
     cl.configure()
 
-    parser = argparse.ArgumentParser(description="run the VNP43NRT BRDF/NDVI/albedo product")
+    parser = argparse.ArgumentParser(description="run the VCD43NRT BRDF/NDVI/albedo algorithm")
 
     parser.add_argument(
         "--date",
@@ -938,10 +829,10 @@ def main(argv=sys.argv):
     fallback_mode = args.fallback_mode
 
     date_message = f"on {cl.time(start)}" if start == end else f"from {cl.time(start)} to {cl.time(end)}"
-    message = f"running VNP43NRT BRDF/NDVI/albedo at {cl.place(tile)} {date_message}"
+    message = f"running VCD43NRT BRDF/NDVI/albedo at {cl.place(tile)} {date_message}"
     logger.info(message)
 
-    vnp43nrt = VNP43NRT(
+    vcd43nrt = VCD43NRT(
         working_directory=working_directory,
         mission=mission,
         mission_priority=mission_priority,
@@ -952,7 +843,7 @@ def main(argv=sys.argv):
     end = dateutil.parser.parse(end).date()
 
     for date_UTC in date_range(start, end):
-        granule = vnp43nrt.VNP43NRT(
+        granule = vcd43nrt.VCD43NRT(
             date_UTC=date_UTC,
             tile=tile,
             diagnostics=diagnostics

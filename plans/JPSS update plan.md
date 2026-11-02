@@ -29,7 +29,7 @@ Add optional multi-mission VIIRS support without breaking existing APIs by intro
 19. Phase 6: VNP43NRT integration
 20. Thread mission/fallback parameters from VNP43NRT into internal VNP09GA instance.
 21. Keep VNP43NRT output behavior compatible by default, but optionally include mission in granule ID/output directory naming for non-SNPP runs to avoid ambiguity.
-22. Verify staging directory generation and Julia handoff remain mission-agnostic, with only input source selection changing. Depends on phases 3-5.
+22. Verify staged rasters from each supported mission preserve the shared observation ordering expected by the PyO3 Rust BRDF solver. Depends on phases 3-5.
 23. Phase 7: Documentation and examples
 24. Update README usage to show:
 - Legacy SNPP-only usage unchanged
