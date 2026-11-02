@@ -14,6 +14,7 @@ from dateutil import parser
 from matplotlib.colors import Colormap
 
 import colored_logging as cl
+import sun_angles
 
 import rasters
 from rasters import Raster, RasterGeometry, Point, Polygon
@@ -26,7 +27,6 @@ from modland import find_modland_tiles, parsehv, generate_modland_grid
 try:
     from ._brdf_rust import nrt_brdf_all
     from .BRDF import bidirectional_reflectance
-    from .SZA import calculate_SZA
     from .VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI
     from .VNP09GA import VNP09GA
     from .VNP09GA_granule import VNP09GAGranule
@@ -37,7 +37,6 @@ try:
 except ImportError:  # pragma: no cover - legacy direct-import fallback
     from _brdf_rust import nrt_brdf_all
     from BRDF import bidirectional_reflectance
-    from SZA import calculate_SZA
     from VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI
     from VNP09GA import VNP09GA
     from VNP09GA_granule import VNP09GAGranule
@@ -53,6 +52,18 @@ with open(join(abspath(dirname(__file__)), "version.txt")) as f:
     version = f.read()
 
 logger = logging.getLogger(__name__)
+
+
+def _calculate_sza(
+    day_of_year: Union[Raster, float],
+    hour_of_day: Union[Raster, float],
+    geometry: RasterGeometry,
+) -> Raster:
+    day_angle_rad = sun_angles.day_angle_rad_from_DOY(day_of_year)
+    solar_dec_deg = sun_angles.solar_dec_deg_from_day_angle_rad(day_angle_rad)
+    sza = sun_angles.SZA_deg_from_lat_dec_hour(geometry.lat, solar_dec_deg, hour_of_day)
+    return Raster(sza, geometry=geometry)
+
 
 class BRDFRetrievalFailed(RuntimeError):
     pass
@@ -426,7 +437,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             logger.info(f"solar zenith noon file already exists: {SZA_filename}")
         else:
             doy = date_UTC.timetuple().tm_yday
-            SZA = calculate_SZA(doy, 12, grid)
+            SZA = _calculate_sza(doy, 12, grid)
             logger.info(f"writing solar zenith noon: {SZA_filename}")
             SZA.to_geotiff(SZA_filename)
 
@@ -579,7 +590,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             granule.add_layer("AOT", AOT)
 
         doy = date_UTC.timetuple().tm_yday
-        SZA = calculate_SZA(doy, 10.5, geometry)
+        SZA = _calculate_sza(doy, 10.5, geometry)
 
         if diagnostics:
             granule.add_layer("SZA", SZA)

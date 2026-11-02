@@ -30,6 +30,7 @@ dependencies = [
     "requests",
     "scikit-image",
     "shapely",
+    "sun-angles",
     "xmltodict",
 ]
 requires-python = ">=3.11"
