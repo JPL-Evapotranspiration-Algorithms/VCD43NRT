@@ -131,7 +131,7 @@ export VCD43NRT_VJ209GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
 
 ## Notes
 
-The former `VNP43NRT` processor import and method remain as deprecated compatibility aliases; new code should use `VCD43NRT`. Existing output directory naming is retained to avoid breaking local caches. This repository supports VIIRS products through Earthaccess/CMR-backed granule discovery and download.
+The former `VCD43NRT` processor import and method remain as deprecated compatibility aliases; new code should use `VCD43NRT`. Existing output directory naming is retained to avoid breaking local caches. This repository supports VIIRS products through Earthaccess/CMR-backed granule discovery and download.
 
 ## References
 

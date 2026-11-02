@@ -218,17 +218,17 @@ class AuxiliaryDownloadFailed(ConnectionError):
 
 class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
     DEFAULT_VNP09GA_DIRECTORY = "VNP09GA_products"
-    DEFAULT_VCD43NRT_DIRECTORY = "VNP43NRT_products"
-    DEFAULT_VNP43NRT_DIRECTORY = DEFAULT_VCD43NRT_DIRECTORY
+    DEFAULT_VCD43NRT_DIRECTORY = "VCD43NRT_products"
+    DEFAULT_VCD43NRT_DIRECTORY = DEFAULT_VCD43NRT_DIRECTORY
 
     def __init__(
             self,
             working_directory: str = None,
             download_directory: str = None,
             VNP09GA_directory: str = None,
-            VNP43NRT_directory: str = None,
+            VCD43NRT_directory: str = None,
             mosaic_directory: str = None,
-            VNP43NRT_staging_directory: str = None,
+            VCD43NRT_staging_directory: str = None,
             GEOS5FP_connection: GEOS5FP = None,
             GEOS5FP_download: str = None,
             mission: str = "SNPP",
@@ -236,21 +236,21 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             fallback_mode: bool = False,
             VCD43NRT_directory: str = None,
             VCD43NRT_staging_directory: str = None):
-        if VCD43NRT_directory is not None and VNP43NRT_directory is not None:
-            raise ValueError("specify only one of VCD43NRT_directory and VNP43NRT_directory")
-        if VCD43NRT_staging_directory is not None and VNP43NRT_staging_directory is not None:
+        if VCD43NRT_directory is not None and VCD43NRT_directory is not None:
+            raise ValueError("specify only one of VCD43NRT_directory and VCD43NRT_directory")
+        if VCD43NRT_staging_directory is not None and VCD43NRT_staging_directory is not None:
             raise ValueError(
-                "specify only one of VCD43NRT_staging_directory and VNP43NRT_staging_directory"
+                "specify only one of VCD43NRT_staging_directory and VCD43NRT_staging_directory"
             )
-        if VNP43NRT_directory is not None:
+        if VCD43NRT_directory is not None:
             warnings.warn(
-                "VNP43NRT_directory is deprecated; use VCD43NRT_directory.",
+                "VCD43NRT_directory is deprecated; use VCD43NRT_directory.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-        if VNP43NRT_staging_directory is not None:
+        if VCD43NRT_staging_directory is not None:
             warnings.warn(
-                "VNP43NRT_staging_directory is deprecated; use VCD43NRT_staging_directory.",
+                "VCD43NRT_staging_directory is deprecated; use VCD43NRT_staging_directory.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -260,9 +260,9 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         working_directory = abspath(expanduser(working_directory))
 
         if VCD43NRT_staging_directory is None:
-            VCD43NRT_staging_directory = VNP43NRT_staging_directory
+            VCD43NRT_staging_directory = VCD43NRT_staging_directory
         if VCD43NRT_staging_directory is None:
-            VCD43NRT_staging_directory = join(working_directory, "VNP43NRT_staging")
+            VCD43NRT_staging_directory = join(working_directory, "VCD43NRT_staging")
 
         if VNP09GA_directory is None:
             VNP09GA_directory = join(working_directory, self.DEFAULT_VNP09GA_DIRECTORY)
@@ -270,7 +270,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         VNP09GA_directory = abspath(expanduser(VNP09GA_directory))
 
         if VCD43NRT_directory is None:
-            VCD43NRT_directory = VNP43NRT_directory
+            VCD43NRT_directory = VCD43NRT_directory
         if VCD43NRT_directory is None:
             VCD43NRT_directory = join(working_directory, self.DEFAULT_VCD43NRT_DIRECTORY)
 
@@ -294,10 +294,10 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
 
         self.VNP09GA_directory = VNP09GA_directory
         self.VCD43NRT_directory = VCD43NRT_directory
-        self.VNP43NRT_directory = self.VCD43NRT_directory
+        self.VCD43NRT_directory = self.VCD43NRT_directory
         self.GEOS5FP = GEOS5FP_connection
         self.VCD43NRT_staging_directory = VCD43NRT_staging_directory
-        self.VNP43NRT_staging_directory = self.VCD43NRT_staging_directory
+        self.VCD43NRT_staging_directory = self.VCD43NRT_staging_directory
         self.mission = self.vnp09ga.mission
         self.mission_priority = self.vnp09ga.mission_priority
         self.fallback_mode = self.vnp09ga.fallback_mode
@@ -512,7 +512,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         if isinstance(date_UTC, str):
             date_UTC = parser.parse(date_UTC).date()
 
-        granule_ID = f"VNP43NRT_A{date_UTC:%Y%j}_{tile}"
+        granule_ID = f"VCD43NRT_A{date_UTC:%Y%j}_{tile}"
 
         if self.fallback_mode:
             granule_ID = f"{granule_ID}_JPSS"
@@ -644,13 +644,13 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
 
         return granule
 
-    def VNP43NRT(
+    def VCD43NRT(
             self,
             date_UTC: Union[date, str],
             tile: str,
             diagnostics: bool = False) -> VCD43NRTGranule:
         warnings.warn(
-            "VNP43NRT is deprecated; use VCD43NRT instead.",
+            "VCD43NRT is deprecated; use VCD43NRT instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -748,13 +748,13 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         return NDVI
 
 
-VNP43NRTGranule = VCD43NRTGranule
+VCD43NRTGranule = VCD43NRTGranule
 
 
-class VNP43NRT(VCD43NRT):
+class VCD43NRT(VCD43NRT):
     def __init__(self, *args, **kwargs):
         warnings.warn(
-            "VNP43NRT is deprecated; use VCD43NRT instead.",
+            "VCD43NRT is deprecated; use VCD43NRT instead.",
             DeprecationWarning,
             stacklevel=2,
         )

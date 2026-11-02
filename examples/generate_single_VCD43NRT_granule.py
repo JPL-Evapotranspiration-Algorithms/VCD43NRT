@@ -2,7 +2,7 @@
 """Generate a single VCD43NRT granule for a specified tile and date.
 
 Example:
-    python scripts/generate_single_vnp43nrt_granule.py \
+    python scripts/generate_single_VCD43NRT_granule.py \
       --tile h09v05 \
       --date 2026-10-10 \
       --working-directory ./scratch/vcd43nrt

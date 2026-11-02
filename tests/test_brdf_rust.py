@@ -3,7 +3,7 @@ import importlib
 import numpy as np
 import pytest
 
-from VCD43NRT import VCD43NRT, VNP43NRT
+from VCD43NRT import VCD43NRT, VCD43NRT
 from VCD43NRT._brdf_rust import nrt_brdf_all
 from VCD43NRT.VCD43NRT import _read_brdf_stack
 
@@ -165,7 +165,7 @@ def test_singular_pixel_fit_fails_with_pixel_index():
 
 def test_rebranded_api_and_legacy_class_alias():
     assert VCD43NRT.__name__ == "VCD43NRT"
-    assert issubclass(VNP43NRT, VCD43NRT)
+    assert issubclass(VCD43NRT, VCD43NRT)
 
 
 def test_canonical_directory_arguments_and_legacy_aliases(tmp_path, monkeypatch):
@@ -187,10 +187,10 @@ def test_canonical_directory_arguments_and_legacy_aliases(tmp_path, monkeypatch)
     )
     assert processor.VCD43NRT_directory == str(output_directory)
     assert processor.VCD43NRT_staging_directory == str(staging_directory)
-    assert processor.VNP43NRT_directory == processor.VCD43NRT_directory
+    assert processor.VCD43NRT_directory == processor.VCD43NRT_directory
 
-    with pytest.warns(DeprecationWarning, match="VNP43NRT is deprecated"):
-        legacy_class = VNP43NRT(
+    with pytest.warns(DeprecationWarning, match="VCD43NRT is deprecated"):
+        legacy_class = VCD43NRT(
             working_directory=str(tmp_path),
             GEOS5FP_connection=object(),
         )
@@ -199,8 +199,8 @@ def test_canonical_directory_arguments_and_legacy_aliases(tmp_path, monkeypatch)
     with pytest.warns(DeprecationWarning, match="deprecated"):
         legacy = VCD43NRT(
             working_directory=str(tmp_path),
-            VNP43NRT_directory=str(output_directory),
-            VNP43NRT_staging_directory=str(staging_directory),
+            VCD43NRT_directory=str(output_directory),
+            VCD43NRT_staging_directory=str(staging_directory),
             GEOS5FP_connection=object(),
         )
     assert legacy.VCD43NRT_directory == str(output_directory)
