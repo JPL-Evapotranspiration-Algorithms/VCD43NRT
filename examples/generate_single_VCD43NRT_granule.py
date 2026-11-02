@@ -30,7 +30,7 @@ def _import_vcd43nrt_class():
         package_dir = repo_root / "VCD43NRT"
         if str(package_dir) not in sys.path:
             sys.path.insert(0, str(package_dir))
-        from VNP43NRT import VCD43NRT  # type: ignore
+        from VCD43NRT import VCD43NRT  # type: ignore
         return VCD43NRT
 
 

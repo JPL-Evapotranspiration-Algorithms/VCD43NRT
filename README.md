@@ -29,7 +29,7 @@ It includes the supporting utilities needed to:
 The active package is organized as a Python package with a Rust extension:
 
 - `VCD43NRT/` — Python package modules
-- `VCD43NRT/VCD43NRT.py` — canonical algorithm API
+- `VCD43NRT/VCD43NRT.py` — canonical algorithm implementation and API
 - `rust/` — Rust BRDF solver and PyO3 extension
 
 ## Prerequisites

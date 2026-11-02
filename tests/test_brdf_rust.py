@@ -5,7 +5,7 @@ import pytest
 
 from VCD43NRT import VCD43NRT, VNP43NRT
 from VCD43NRT._brdf_rust import nrt_brdf_all
-from VCD43NRT.VNP43NRT import _read_brdf_stack
+from VCD43NRT.VCD43NRT import _read_brdf_stack
 
 
 def _synthetic_inputs():
@@ -169,7 +169,7 @@ def test_rebranded_api_and_legacy_class_alias():
 
 
 def test_canonical_directory_arguments_and_legacy_aliases(tmp_path, monkeypatch):
-    processing_module = importlib.import_module("VCD43NRT.VNP43NRT")
+    processing_module = importlib.import_module("VCD43NRT.VCD43NRT")
 
     class FakeVIIRS:
         mission = "SNPP"
@@ -218,7 +218,7 @@ def test_staged_stack_uses_shared_date_order_and_checks_shapes(tmp_path, monkeyp
         str(tmp_path / "2026-10-01_M1.tif"): np.array([[1, 2], [3, 4]]),
         str(tmp_path / "2026-10-02_M1.tif"): np.array([[5, 6], [7, 8]]),
     }
-    processing_module = importlib.import_module("VCD43NRT.VNP43NRT")
+    processing_module = importlib.import_module("VCD43NRT.VCD43NRT")
     monkeypatch.setattr(
         processing_module.Raster,
         "open",
