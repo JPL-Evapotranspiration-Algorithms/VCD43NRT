@@ -24,21 +24,23 @@ def test_default_working_directory_uses_central_constant():
 
 def test_normalize_mission_aliases():
     assert normalize_mission("SNPP") == "SNPP"
-    assert normalize_mission("noaa-20") == "NOAA20"
-    assert normalize_mission("jpss-2") == "NOAA21"
+    assert normalize_mission("JPSS1") == "JPSS1"
+    assert normalize_mission("jpss-2") == "JPSS2"
+    assert normalize_mission("noaa-20") == "JPSS1"
+    assert normalize_mission("NOAA21") == "JPSS2"
 
 
 def test_normalize_mission_priority_string():
-    priority = normalize_mission_priority("SNPP,NOAA20,NOAA21", mission="SNPP", fallback_mode=True)
-    assert priority == ("SNPP", "NOAA20", "NOAA21")
+    priority = normalize_mission_priority("SNPP,JPSS1,JPSS2", mission="SNPP", fallback_mode=True)
+    assert priority == ("SNPP", "JPSS1", "JPSS2")
 
 
 def test_default_mission_priority_behavior():
-    disabled = normalize_mission_priority(None, mission="NOAA20", fallback_mode=False)
+    disabled = normalize_mission_priority(None, mission="JPSS1", fallback_mode=False)
     enabled = normalize_mission_priority(None, mission=DEFAULT_MISSION, fallback_mode=True)
 
-    assert disabled == ("NOAA20",)
-    assert enabled == ("SNPP", "NOAA20", "NOAA21")
+    assert disabled == ("JPSS1",)
+    assert enabled == ("SNPP", "JPSS1", "JPSS2")
 
 
 def test_filename_parsing_for_supported_prefixes():
@@ -48,18 +50,20 @@ def test_filename_parsing_for_supported_prefixes():
 
     assert modland_tile_from_filename(snpp_name) == "h08v05"
     assert mission_from_filename(snpp_name) == "SNPP"
-    assert mission_from_filename(n20_name) == "NOAA20"
-    assert mission_from_filename(n21_name) == "NOAA21"
+    assert mission_from_filename(n20_name) == "JPSS1"
+    assert mission_from_filename(n21_name) == "JPSS2"
 
 
 def test_mission_registry_contains_required_entries():
     assert "SNPP" in VIIRS_MISSIONS
-    assert "NOAA20" in VIIRS_MISSIONS
-    assert "NOAA21" in VIIRS_MISSIONS
+    assert "JPSS1" in VIIRS_MISSIONS
+    assert "JPSS2" in VIIRS_MISSIONS
 
     assert VIIRS_MISSIONS["SNPP"].short_name == "VNP09GA"
-    assert VIIRS_MISSIONS["NOAA20"].short_name == "VJ109GA"
-    assert VIIRS_MISSIONS["NOAA21"].short_name == "VJ209GA"
+    assert VIIRS_MISSIONS["JPSS1"].short_name == "VJ109GA"
+    assert VIIRS_MISSIONS["JPSS2"].short_name == "VJ209GA"
+    assert VJ109GA.DEFAULT_MISSION == "JPSS1"
+    assert VJ209GA.DEFAULT_MISSION == "JPSS2"
 
 
 def test_viirs_class_hierarchy():

@@ -30,17 +30,17 @@ VIIRS_MISSIONS: Dict[str, VIIRSMissionConfig] = {
         concept_id_env="VCD43NRT_VNP09GA_CONCEPT_ID",
         default_concept_id="C2631841556-LPCLOUD",
     ),
-    "NOAA20": VIIRSMissionConfig(
-        key="NOAA20",
-        display_name="NOAA-20 (JPSS-1)",
+    "JPSS1": VIIRSMissionConfig(
+        key="JPSS1",
+        display_name="JPSS-1",
         short_name="VJ109GA",
         product_prefix="VJ1",
         concept_id_env="VCD43NRT_VJ109GA_CONCEPT_ID",
         default_concept_id="C2631841524-LPCLOUD",
     ),
-    "NOAA21": VIIRSMissionConfig(
-        key="NOAA21",
-        display_name="NOAA-21 (JPSS-2)",
+    "JPSS2": VIIRSMissionConfig(
+        key="JPSS2",
+        display_name="JPSS-2",
         short_name="VJ209GA",
         product_prefix="VJ2",
         concept_id_env="VCD43NRT_VJ209GA_CONCEPT_ID",
@@ -48,30 +48,30 @@ VIIRS_MISSIONS: Dict[str, VIIRSMissionConfig] = {
 }
 
 DEFAULT_MISSION = "SNPP"
-DEFAULT_MISSION_PRIORITY: Tuple[str, ...] = ("SNPP", "NOAA20", "NOAA21")
+DEFAULT_MISSION_PRIORITY: Tuple[str, ...] = ("SNPP", "JPSS1", "JPSS2")
 
 MISSION_ALIASES = {
     "SNPP": "SNPP",
     "SUOMI": "SNPP",
     "SUOMINPP": "SNPP",
     "NPP": "SNPP",
-    "NOAA20": "NOAA20",
-    "NOAA-20": "NOAA20",
-    "JPSS1": "NOAA20",
-    "JPSS-1": "NOAA20",
-    "N20": "NOAA20",
-    "NOAA21": "NOAA21",
-    "NOAA-21": "NOAA21",
-    "JPSS2": "NOAA21",
-    "JPSS-2": "NOAA21",
-    "N21": "NOAA21",
+    "NOAA20": "JPSS1",
+    "NOAA-20": "JPSS1",
+    "JPSS1": "JPSS1",
+    "JPSS-1": "JPSS1",
+    "N20": "JPSS1",
+    "NOAA21": "JPSS2",
+    "NOAA-21": "JPSS2",
+    "JPSS2": "JPSS2",
+    "JPSS-2": "JPSS2",
+    "N21": "JPSS2",
 }
 
 VIIRS_FILENAME_REGEX = re.compile(r"^(VNP|VJ1|VJ2)09GA\.[^.]+\.([^.]+)\.\d{3}\.\d+\.h5$")
 PREFIX_TO_MISSION = {
     "VNP": "SNPP",
-    "VJ1": "NOAA20",
-    "VJ2": "NOAA21",
+    "VJ1": "JPSS1",
+    "VJ2": "JPSS2",
 }
 
 

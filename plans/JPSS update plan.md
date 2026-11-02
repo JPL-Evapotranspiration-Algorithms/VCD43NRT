@@ -1,16 +1,16 @@
 ## Plan: JPSS Multi-Mission VIIRS Access
 
-Add optional multi-mission VIIRS support without breaking existing APIs by introducing a mission registry, parameterizing CMR discovery and local product naming, and implementing mission-priority fallback across Suomi NPP, NOAA-20, and NOAA-21. Keep current VNP behavior as default while enabling automatic fallback when data is unavailable for a date/tile.
+Add optional multi-mission VIIRS support without breaking existing APIs by introducing a mission registry, parameterizing CMR discovery and local product naming, and implementing mission-priority fallback across Suomi NPP, JPSS-1, and JPSS-2. Keep current VNP behavior as default while enabling automatic fallback when data is unavailable for a date/tile.
 
 **Steps**
 1. Phase 1: Baseline and interface contract
 2. Confirm public entry points that must remain stable: VNP09GA constructor and VNP43NRT constructor, plus existing methods used by examples and README workflows. Document current defaults and expected behavior from VNP-only mode. This is blocking for all later steps.
 3. Define new optional parameters with backward-compatible defaults:
 - mission: single mission selector (default SNPP behavior)
-- mission_priority: ordered list for fallback (default [SNPP, NOAA20, NOAA21] when fallback mode is enabled)
+- mission_priority: ordered list for fallback (default [SNPP, JPSS1, JPSS2] when fallback mode is enabled)
 - fallback_mode: boolean or strategy enum controlling whether to search one mission or try ordered missions
 4. Phase 2: Mission configuration abstraction
-5. Create a new mission/product config module containing per-mission metadata: product prefix, CMR concept ID, filename regex patterns, dataset path templates, scale factors, and albedo coefficients. Keep SNPP values as currently implemented and add placeholders or validated values for NOAA20 and NOAA21.
+5. Create a new mission/product config module containing per-mission metadata: product prefix, CMR concept ID, filename regex patterns, dataset path templates, scale factors, and albedo coefficients. Keep SNPP values as currently implemented and add placeholders or validated values for JPSS1 and JPSS2.
 6. Add mission normalization helpers and validation to reject unsupported mission keys early with clear errors.
 7. Phase 3: CMR query and granule matching refactor
 8. Refactor VIIRS_CMR_query to accept mission configuration and perform mission-scoped queries.
@@ -33,7 +33,7 @@ Add optional multi-mission VIIRS support without breaking existing APIs by intro
 23. Phase 7: Documentation and examples
 24. Update README usage to show:
 - Legacy SNPP-only usage unchanged
-- Single explicit mission usage (NOAA20, NOAA21)
+- Single explicit mission usage (JPSS1, JPSS2)
 - Priority fallback usage across missions
 25. Update example script to optionally accept mission and mission priority arguments.
 26. Update package description text where needed to reflect multi-mission VIIRS coverage.
@@ -57,13 +57,13 @@ Add optional multi-mission VIIRS support without breaking existing APIs by intro
 **Verification**
 1. Static checks: run package tests after adding mission/fallback tests; verify no regressions in existing SNPP behavior.
 2. Constructor compatibility checks: instantiate VNP09GA() and VNP43NRT() with no new args and confirm defaults are unchanged.
-3. Mission parsing tests: validate date/tile extraction for SNPP, NOAA20, NOAA21 filename samples.
+3. Mission parsing tests: validate date/tile extraction for SNPP, JPSS1, JPSS2 filename samples.
 4. Fallback tests with mocked CMR: ensure selection honors mission_priority order and stops at first available mission for date/tile workflows.
 5. Live smoke checks (when Earthdata credentials exist): run CMR discovery and one granule download for each configured mission, then one fallback-enabled call where first mission is intentionally unavailable.
 6. End-to-end product check: generate one granule with fallback enabled and confirm NDVI/albedo files are produced with expected directory naming.
 
 **Decisions**
-- Include both NOAA-20 and NOAA-21 in this scope.
+- Include both JPSS-1 and JPSS-2 in this scope.
 - Runtime behavior uses mission-priority fallback when enabled.
 - Preserve no-break API compatibility; all new behavior is opt-in or default-safe.
 - Include live network smoke validation when credentials are available.

@@ -2,7 +2,7 @@
 
 VCD43NRT is a Python package for VIIRS/NRT data access and BRDF, albedo, and NDVI processing. The algorithm is exposed through the `VCD43NRT` processor class; VIIRS source-product APIs such as `VNP09GA`, `VJ109GA`, and `VJ209GA` retain their NASA product names.
 
-The data-access layer supports Suomi NPP plus equivalent JPSS VIIRS products for NOAA-20 and NOAA-21 through mission selection and mission-priority fallback.
+The data-access layer supports Suomi NPP plus equivalent JPSS VIIRS products for JPSS-1 and JPSS-2 through mission selection and mission-priority fallback.
 
 The package uses Python for VIIRS data access, raster preparation, and output writing, and a Rust BRDF solver exposed through PyO3 for array processing.
 
@@ -89,8 +89,8 @@ python examples/generate_single_VCD43NRT_granule.py \
 Optional flags:
 
 - `--diagnostics` to also write diagnostic layers
-- `--mission NOAA20` (or `NOAA21`) to force a specific JPSS mission
-- `--fallback-mode --mission-priority SNPP,NOAA20,NOAA21` to automatically try missions in order
+- `--mission JPSS1` (or `JPSS2`) to force a specific JPSS mission
+- `--fallback-mode --mission-priority SNPP,JPSS1,JPSS2` to automatically try missions in order
 
 ### Mission selection and fallback
 
@@ -107,7 +107,7 @@ To target one JPSS mission explicitly:
 ```python
 processor = VCD43NRT(
 	working_directory="~/data/VCD43NRT",
-	mission="NOAA20",
+	mission="JPSS1",
 )
 ```
 
@@ -117,11 +117,11 @@ To enable automatic mission-priority fallback:
 processor = VCD43NRT(
 	working_directory="~/data/VCD43NRT",
 	fallback_mode=True,
-	mission_priority=["SNPP", "NOAA20", "NOAA21"],
+	mission_priority=["SNPP", "JPSS1", "JPSS2"],
 )
 ```
 
-If NOAA-20/NOAA-21 concept IDs change or are unavailable by default in your environment,
+If JPSS-1/JPSS-2 concept IDs change or are unavailable by default in your environment,
 you can override them with environment variables:
 
 ```bash

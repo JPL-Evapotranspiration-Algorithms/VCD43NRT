@@ -53,12 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mission",
         default="SNPP",
-        help="VIIRS mission key: SNPP, NOAA20, or NOAA21",
+        help="VIIRS mission key: SNPP, JPSS1, or JPSS2",
     )
     parser.add_argument(
         "--mission-priority",
         default=None,
-        help="Comma-separated mission fallback order, e.g. SNPP,NOAA20,NOAA21",
+        help="Comma-separated mission fallback order, e.g. SNPP,JPSS1,JPSS2",
     )
     parser.add_argument(
         "--fallback-mode",

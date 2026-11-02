@@ -787,14 +787,14 @@ def main(argv=sys.argv):
         "--mission",
         dest="mission",
         default="SNPP",
-        help="VIIRS mission key (SNPP, NOAA20, NOAA21)"
+        help="VIIRS mission key (SNPP, JPSS1, JPSS2)"
     )
 
     parser.add_argument(
         "--mission-priority",
         dest="mission_priority",
         default=None,
-        help="Comma-separated fallback priority, e.g. SNPP,NOAA20,NOAA21"
+        help="Comma-separated fallback priority, e.g. SNPP,JPSS1,JPSS2"
     )
 
     parser.add_argument(

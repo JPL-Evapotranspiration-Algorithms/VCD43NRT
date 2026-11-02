@@ -50,7 +50,7 @@ def main():
     "-m",
     default=VNP09GA.DEFAULT_MISSION,
     show_default=True,
-    help="Target mission (e.g., SNPP, NOAA20, NOAA21).",
+    help="Target mission (e.g., SNPP, JPSS1, JPSS2).",
 )
 @click.option(
     "--fallback/--no-fallback",
@@ -93,7 +93,7 @@ def list_granules_command(tile: str, start_date: str, end_date: str, mission: st
     "-m",
     default=VNP09GA.DEFAULT_MISSION,
     show_default=True,
-    help="Target mission (e.g., SNPP, NOAA20, NOAA21).",
+    help="Target mission (e.g., SNPP, JPSS1, JPSS2).",
 )
 @click.option(
     "--fallback/--no-fallback",
