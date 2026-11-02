@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date
 from pathlib import Path
 
 import colored_logging as cl
@@ -39,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Generate one VCD43NRT granule at a specific MODLAND tile/date"
     )
     parser.add_argument("--tile", default="h08v05", help="MODLAND tile, e.g. h09v05")
-    parser.add_argument("--date", default="2026-10-10", help="UTC date (YYYY-MM-DD)")
+    parser.add_argument("--date", default=date.today().isoformat(), help="UTC date (YYYY-MM-DD)")
     parser.add_argument(
         "--working-directory",
         default="~/data/VCD43NRT",

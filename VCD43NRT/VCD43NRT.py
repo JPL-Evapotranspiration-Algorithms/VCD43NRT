@@ -773,12 +773,12 @@ def main(argv=sys.argv):
 
     parser.add_argument(
         "--start",
-        dest="start"
+        dest="start",
     )
 
     parser.add_argument(
         "--end",
-        dest="end"
+        dest="end",
     )
 
     parser.add_argument(
@@ -818,17 +818,18 @@ def main(argv=sys.argv):
 
     args = parser.parse_args(args=argv[1:])
 
+    today = date.today().isoformat()
     if args.start is not None:
         start = args.start
-    elif args.start is None and args.date is not None:
+    elif args.date is not None:
         start = args.date
     else:
-        raise ValueError("no dates given")
+        start = today
 
     end = args.end
 
     if end is None:
-        end = start
+        end = args.date if args.start is None and args.date is not None else today
 
     if args.tile is None:
         raise ValueError("no tile given")

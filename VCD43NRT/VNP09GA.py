@@ -1,4 +1,5 @@
 import sys
+from datetime import date
 from os.path import abspath, expanduser
 from typing import List, Optional, Sequence
 
@@ -43,8 +44,22 @@ def main():
 
 @main.command(name="list")
 @click.option("--tile", "-t", required=True, type=str, help="MODIS/VIIRS tile ID (e.g., h08v05).")
-@click.option("--start-date", "-s", required=True, type=str, help="Start date (YYYY-MM-DD).")
-@click.option("--end-date", "-e", required=True, type=str, help="End date (YYYY-MM-DD).")
+@click.option(
+    "--start-date",
+    "-s",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="Start date (YYYY-MM-DD).",
+)
+@click.option(
+    "--end-date",
+    "-e",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="End date (YYYY-MM-DD).",
+)
 @click.option(
     "--mission",
     "-m",
@@ -79,8 +94,22 @@ def list_granules_command(tile: str, start_date: str, end_date: str, mission: st
 
 @main.command(name="download")
 @click.option("--tile", "-t", required=True, type=str, help="MODIS/VIIRS tile ID (e.g., h08v05).")
-@click.option("--start-date", "-s", required=True, type=str, help="Start date (YYYY-MM-DD).")
-@click.option("--end-date", "-e", required=True, type=str, help="End date (YYYY-MM-DD).")
+@click.option(
+    "--start-date",
+    "-s",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="Start date (YYYY-MM-DD).",
+)
+@click.option(
+    "--end-date",
+    "-e",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="End date (YYYY-MM-DD).",
+)
 @click.option(
     "--download-dir",
     "-d",
