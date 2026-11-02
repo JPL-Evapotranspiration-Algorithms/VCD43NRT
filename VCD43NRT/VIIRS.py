@@ -25,10 +25,8 @@ from .VIIRS_granule import VIIRSGranule
 
 try:
     from .login import login
-    from .daterange import get_date
 except ImportError:  # pragma: no cover - legacy direct-import fallback
     from login import login
-    from daterange import get_date
 
 
 logger = logging.getLogger(__name__)
@@ -122,7 +120,7 @@ class VIIRS:
         filename = self._granule_filename(granule)
         mission_key = mission_from_filename(filename)
         mission_cfg = VIIRS_MISSIONS[mission_key]
-        date_utc = get_date(granule["umm"]["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"])
+        date_utc = parser.parse(granule["umm"]["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]).date()
 
         return join(self.download_directory, mission_cfg.short_name, f"{date_utc:%Y.%m.%d}", filename)
 
@@ -174,7 +172,7 @@ class VIIRS:
             for granule in granules:
                 filename = self._granule_filename(granule)
                 key = (
-                    get_date(granule["umm"]["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]),
+                    parser.parse(granule["umm"]["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]).date(),
                     modland_tile_from_filename(filename),
                 )
                 if key not in granules_by_key:
@@ -189,7 +187,7 @@ class VIIRS:
         data = pd.DataFrame(
             [
                 {
-                    "date_UTC": get_date(granule["umm"]["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]),
+                    "date_UTC": parser.parse(granule["umm"]["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]).date(),
                     "tile": modland_tile_from_filename(self._granule_filename(granule)),
                     "mission": mission_from_filename(self._granule_filename(granule)),
                     "granule": granule,

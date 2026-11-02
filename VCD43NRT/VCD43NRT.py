@@ -12,6 +12,7 @@ import dateutil
 import numpy as np
 from dateutil import parser
 from matplotlib.colors import Colormap
+from pytictoc import TicToc
 
 import colored_logging as cl
 import sun_angles
@@ -32,8 +33,6 @@ try:
     from .VNP09GA_granule import VNP09GAGranule
     from .VIIRS_granule import ALBEDO_COLORMAP, NDVI_COLORMAP
     from .VIIRS import VIIRSUnavailableError
-    from .daterange import date_range
-    from .timer import Timer
 except ImportError:  # pragma: no cover - legacy direct-import fallback
     from _brdf_rust import nrt_brdf_all
     from BRDF import bidirectional_reflectance
@@ -42,8 +41,6 @@ except ImportError:  # pragma: no cover - legacy direct-import fallback
     from VNP09GA_granule import VNP09GAGranule
     from VIIRS_granule import ALBEDO_COLORMAP, NDVI_COLORMAP
     from VIIRS import VIIRSUnavailableError
-    from daterange import date_range
-    from timer import Timer
 
 DEFAULT_WEIGHTED = True
 DEFAULT_SCALE = 1.87
@@ -374,7 +371,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         geometry = granule.geometry(band)
         observation_dates = []
 
-        for processing_date in date_range(start_date, end_date):
+        for processing_date in [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]:
             logger.info(f"retrieving VNP09GA for VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
 
             try:
@@ -442,7 +439,8 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             SZA.to_geotiff(SZA_filename)
 
         logger.info(f"started processing VCD43NRT BRDF parameters at {cl.place(tile)} on {cl.time(date_UTC)}")
-        timer = Timer()
+        timer = TicToc()
+        timer.tic()
         if not observation_dates:
             raise BRDFRetrievalFailed(f"no reflectance/angle observations available for {tile} on {date_UTC}")
 
@@ -490,7 +488,8 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         count = rasters_by_name["count"]
 
         logger.info(
-            f"finished processing VCD43NRT BRDF parameters at {cl.place(tile)} on {cl.time(date_UTC)} ({cl.time(timer)})")
+            f"finished processing VCD43NRT BRDF parameters at {cl.place(tile)} on {cl.time(date_UTC)} "
+            f"({cl.time(f'{timer.tocvalue():0.2f}')})")
 
         BRDF_parameters = BRDFParameters(
             WSA=WSA,
@@ -543,7 +542,8 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             date_UTC = parser.parse(date_UTC).date()
 
         logger.info(f"started processing VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
-        timer = Timer()
+        timer = TicToc()
+        timer.tic()
 
         directory = self.granule_directory(
             date_UTC=date_UTC,
@@ -638,7 +638,9 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
 
         albedo = Raster(rasters.clip(albedo, 0, 1), geometry=b[1].geometry)
         granule.add_layer("albedo", albedo)
-        logger.info(f"finished processing VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)} ({cl.time(timer)})")
+        logger.info(
+            f"finished processing VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)} "
+            f"({cl.time(f'{timer.tocvalue():0.2f}')})")
 
         return granule
 
@@ -853,7 +855,7 @@ def main(argv=sys.argv):
     start = dateutil.parser.parse(start).date()
     end = dateutil.parser.parse(end).date()
 
-    for date_UTC in date_range(start, end):
+    for date_UTC in [start + timedelta(days=i) for i in range((end - start).days + 1)]:
         granule = vcd43nrt.VCD43NRT(
             date_UTC=date_UTC,
             tile=tile,

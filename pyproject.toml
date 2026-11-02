@@ -26,6 +26,7 @@ dependencies = [
     "numpy",
     "pandas",
     "python-dateutil",
+    "pytictoc",
     "rasters",
     "requests",
     "scikit-image",
