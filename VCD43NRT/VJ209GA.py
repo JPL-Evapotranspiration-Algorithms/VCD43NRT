@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 import click
@@ -12,7 +13,7 @@ class VJ209GA(VIIRS):
     DEFAULT_MOSAIC_DIRECTORY = "VJ209GA_mosaics"
 
     PRODUCT_SHORT_NAME = "VJ209GA"
-    DEFAULT_MISSION = "NOAA21"
+    DEFAULT_MISSION = "JPSS2"
     GRANULE_CLASS = VJ209GAGranule
 
     def prefetch_VJ209GA(self, start_date, end_date, geometry=None):
@@ -27,14 +28,28 @@ def main():
 
 @main.command(name="list")
 @click.option("--tile", "-t", required=True, type=str, help="MODIS/VIIRS tile ID (e.g., h08v05).")
-@click.option("--start-date", "-s", required=True, type=str, help="Start date (YYYY-MM-DD).")
-@click.option("--end-date", "-e", required=True, type=str, help="End date (YYYY-MM-DD).")
+@click.option(
+    "--start-date",
+    "-s",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="Start date (YYYY-MM-DD).",
+)
+@click.option(
+    "--end-date",
+    "-e",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="End date (YYYY-MM-DD).",
+)
 @click.option(
     "--mission",
     "-m",
     default=VJ209GA.DEFAULT_MISSION,
     show_default=True,
-    help="Target mission (e.g., NOAA21, NOAA20, SNPP).",
+    help="Target mission (e.g., JPSS2, JPSS1, SNPP).",
 )
 @click.option(
     "--fallback/--no-fallback",
@@ -63,8 +78,22 @@ def list_granules_command(tile: str, start_date: str, end_date: str, mission: st
 
 @main.command(name="download")
 @click.option("--tile", "-t", required=True, type=str, help="MODIS/VIIRS tile ID (e.g., h08v05).")
-@click.option("--start-date", "-s", required=True, type=str, help="Start date (YYYY-MM-DD).")
-@click.option("--end-date", "-e", required=True, type=str, help="End date (YYYY-MM-DD).")
+@click.option(
+    "--start-date",
+    "-s",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="Start date (YYYY-MM-DD).",
+)
+@click.option(
+    "--end-date",
+    "-e",
+    default=lambda: date.today().isoformat(),
+    show_default=True,
+    type=str,
+    help="End date (YYYY-MM-DD).",
+)
 @click.option(
     "--download-dir",
     "-d",
@@ -77,7 +106,7 @@ def list_granules_command(tile: str, start_date: str, end_date: str, mission: st
     "-m",
     default=VJ209GA.DEFAULT_MISSION,
     show_default=True,
-    help="Target mission (e.g., NOAA21, NOAA20, SNPP).",
+    help="Target mission (e.g., JPSS2, JPSS1, SNPP).",
 )
 @click.option(
     "--fallback/--no-fallback",

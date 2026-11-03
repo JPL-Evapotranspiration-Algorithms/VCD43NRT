@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate a single VNP43NRT granule for a specified tile and date.
+"""Generate a single VCD43NRT granule for a specified tile and date.
 
 Example:
-    python scripts/generate_single_vnp43nrt_granule.py \
+    python scripts/generate_single_VCD43NRT_granule.py \
       --tile h09v05 \
       --date 2026-10-10 \
       --working-directory ./scratch/vcd43nrt
@@ -12,38 +12,39 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date
 from pathlib import Path
 
 import colored_logging as cl
 
 
-def _import_vnp43nrt_class():
-    """Import VNP43NRT from the source tree or an installed package."""
+def _import_vcd43nrt_class():
+    """Import VCD43NRT from the source tree or an installed package."""
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
     try:
-        from VCD43NRT.VNP43NRT import VNP43NRT  # type: ignore
-        return VNP43NRT
+        from VCD43NRT.VCD43NRT import VCD43NRT  # type: ignore
+        return VCD43NRT
     except Exception:
         package_dir = repo_root / "VCD43NRT"
         if str(package_dir) not in sys.path:
             sys.path.insert(0, str(package_dir))
-        from VNP43NRT import VNP43NRT  # type: ignore
-        return VNP43NRT
+        from VCD43NRT import VCD43NRT  # type: ignore
+        return VCD43NRT
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate one VNP43NRT granule at a specific MODLAND tile/date"
+        description="Generate one VCD43NRT granule at a specific MODLAND tile/date"
     )
     parser.add_argument("--tile", default="h08v05", help="MODLAND tile, e.g. h09v05")
-    parser.add_argument("--date", default="2026-10-10", help="UTC date (YYYY-MM-DD)")
+    parser.add_argument("--date", default=date.today().isoformat(), help="UTC date (YYYY-MM-DD)")
     parser.add_argument(
         "--working-directory",
         default="~/data/VCD43NRT",
-        help="Working/output directory used by VNP43NRT (default: ~/data/VCD43NRT)",
+        help="Working/output directory used by VCD43NRT (default: ~/data/VCD43NRT)",
     )
     parser.add_argument(
         "--diagnostics",
@@ -51,19 +52,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write diagnostic layers in addition to required outputs",
     )
     parser.add_argument(
-        "--initialize-julia",
-        action="store_true",
-        help="Instantiate Julia project before processing",
-    )
-    parser.add_argument(
         "--mission",
         default="SNPP",
-        help="VIIRS mission key: SNPP, NOAA20, or NOAA21",
+        help="VIIRS mission key: SNPP, JPSS1, or JPSS2",
     )
     parser.add_argument(
         "--mission-priority",
         default=None,
-        help="Comma-separated mission fallback order, e.g. SNPP,NOAA20,NOAA21",
+        help="Comma-separated mission fallback order, e.g. SNPP,JPSS1,JPSS2",
     )
     parser.add_argument(
         "--fallback-mode",
@@ -77,11 +73,10 @@ def main(argv: list[str] | None = None) -> int:
     cl.configure()
     args = build_parser().parse_args(argv)
 
-    VNP43NRT = _import_vnp43nrt_class()
+    VCD43NRT = _import_vcd43nrt_class()
 
-    processor = VNP43NRT(
+    processor = VCD43NRT(
         working_directory=args.working_directory,
-        initialize_julia=args.initialize_julia,
         mission=args.mission,
         mission_priority=args.mission_priority,
         fallback_mode=args.fallback_mode,
@@ -93,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         import shutil
         shutil.rmtree(granule_dir, ignore_errors=True)
 
-    granule = processor.VNP43NRT(
+    granule = processor.VCD43NRT(
         date_UTC=args.date,
         tile=args.tile,
         diagnostics=args.diagnostics,

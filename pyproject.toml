@@ -1,18 +1,19 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
 
 [project]
 name = "VCD43NRT"
 version = "0.1.0"
-description = "VIIRS/NRT albedo and NDVI product support across SNPP and JPSS missions"
+description = "VIIRS near-real-time BRDF, albedo, and NDVI processing across SNPP and JPSS missions"
 readme = "README.md"
 authors = [
     { name = "Gregory H. Halverson", email = "gregory.h.halverson@jpl.nasa.gov" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
 ]
 dependencies = [
     "beautifulsoup4",
@@ -25,10 +26,12 @@ dependencies = [
     "numpy",
     "pandas",
     "python-dateutil",
+    "pytictoc",
     "rasters",
     "requests",
     "scikit-image",
     "shapely",
+    "sun-angles",
     "xmltodict",
 ]
 requires-python = ">=3.11"
@@ -42,20 +45,18 @@ dev = [
     "twine",
 ]
 
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.package-data]
-VCD43NRT = ["*.txt", "*.toml", "*.jl"]
-
-[tool.setuptools.packages.find]
-include = ["VCD43NRT"]
-exclude = []
+[tool.maturin]
+manifest-path = "rust/Cargo.toml"
+python-source = "."
+module-name = "VCD43NRT._brdf_rust"
+features = ["pyo3/extension-module"]
+include = ["VCD43NRT/*.txt"]
 
 [project.urls]
 Homepage = "https://github.com/"
 
 [project.scripts]
+VCD43NRT = "VCD43NRT.VCD43NRT:main"
 VNP09GA = "VCD43NRT.VNP09GA:main"
 VJ109GA = "VCD43NRT.VJ109GA:main"
 VJ209GA = "VCD43NRT.VJ209GA:main"

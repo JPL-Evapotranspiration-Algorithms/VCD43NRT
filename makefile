@@ -3,7 +3,7 @@ PACKAGE_NAME = VCD43NRT
 ENVIRONMENT_NAME = $(PACKAGE_NAME)
 DOCKER_IMAGE_NAME = $(shell echo $(PACKAGE_NAME) | tr '[:upper:]' '[:lower:]')
 
-.PHONY: clean test test-julia build twine-upload dist install-package install uninstall reinstall environment remove-environment install-julia colima-start docker-build docker-build-environment docker-build-installation docker-interactive docker-remove
+.PHONY: clean test build twine-upload dist install-package install uninstall reinstall environment remove-environment colima-start docker-build docker-build-environment docker-build-installation docker-interactive docker-remove
 
 # --- Cleaning and Maintenance ---
 
@@ -20,11 +20,9 @@ clean:
 
 test:
 	@echo "Running tests..."
+	cargo fmt --manifest-path rust/Cargo.toml -- --check
+	cargo test --manifest-path rust/Cargo.toml
 	PYTHONPATH=. pytest
-
-test-julia:
-	@echo "Testing Julia environment..."
-	julia --project=VCD43NRT VCD43NRT/VNP43NRT/process_VNP43NRT.jl
 
 # --- Package Management ---
 
@@ -41,10 +39,10 @@ dist: clean build twine-upload
 
 install-package:
 	@echo "Installing package in development mode..."
-	pip install -e .[dev]
+	python -m pip install -e ".[dev]"
 
-install: install-julia install-package
-	@echo "All installations complete."
+install: install-package
+	@echo "Package installed; source builds require a Rust toolchain."
 
 uninstall:
 	@echo "Uninstalling $(PACKAGE_NAME)..."
@@ -57,15 +55,11 @@ reinstall: uninstall install
 
 environment:
 	@echo "Creating mamba environment: $(ENVIRONMENT_NAME)..."
-	mamba create -y -n $(ENVIRONMENT_NAME) -c conda-forge python=3.11
+	mamba create -y -n $(ENVIRONMENT_NAME) -c conda-forge python=3.11 rust
 
 remove-environment:
 	@echo "Removing mamba environment: $(ENVIRONMENT_NAME)..."
 	mamba env remove -y -n $(ENVIRONMENT_NAME)
-
-install-julia:
-	@echo "Installing pinned Julia packages from Manifest.toml..."
-	julia --project=VCD43NRT -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
 
 # --- Docker & Colima ---
 
