@@ -92,6 +92,15 @@ Optional flags:
 - `--mission JPSS1` (or `JPSS2`) to force a specific JPSS mission
 - `--fallback-mode --mission-priority SNPP,JPSS1,JPSS2` to automatically try missions in order
 
+For a dedicated example that always uses JPSS-1 inputs and does not fall back to another mission:
+
+```bash
+python examples/generate_single_VCD43NRT_granule_JPSS1.py \
+	--tile h09v05 \
+	--date 2026-10-10 \
+	--working-directory ./scratch/vcd43nrt
+```
+
 ### Mission selection and fallback
 
 Default behavior is unchanged and uses Suomi NPP only:

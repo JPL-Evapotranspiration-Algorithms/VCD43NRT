@@ -30,17 +30,21 @@ try:
     from .BRDF import bidirectional_reflectance
     from .VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI
     from .VNP09GA import VNP09GA
+    from .VJ109GA import VJ109GA
     from .VNP09GA_granule import VNP09GAGranule
     from .VIIRS_granule import ALBEDO_COLORMAP, NDVI_COLORMAP
     from .VIIRS import VIIRSUnavailableError
+    from .VIIRS_missions import normalize_mission
 except ImportError:  # pragma: no cover - legacy direct-import fallback
     from _brdf_rust import nrt_brdf_all
     from BRDF import bidirectional_reflectance
     from VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI
     from VNP09GA import VNP09GA
+    from VJ109GA import VJ109GA
     from VNP09GA_granule import VNP09GAGranule
     from VIIRS_granule import ALBEDO_COLORMAP, NDVI_COLORMAP
     from VIIRS import VIIRSUnavailableError
+    from VIIRS_missions import normalize_mission
 
 DEFAULT_WEIGHTED = True
 DEFAULT_SCALE = 1.87
@@ -264,8 +268,13 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         if VCD43NRT_staging_directory is None:
             VCD43NRT_staging_directory = join(working_directory, "VCD43NRT_staging")
 
+        product_class = VJ109GA if normalize_mission(mission) == "JPSS1" else VNP09GA
+
         if VNP09GA_directory is None:
-            VNP09GA_directory = join(working_directory, self.DEFAULT_VNP09GA_DIRECTORY)
+            VNP09GA_directory = join(
+                working_directory,
+                VJ109GA.DEFAULT_PRODUCTS_DIRECTORY if product_class is VJ109GA else self.DEFAULT_VNP09GA_DIRECTORY,
+            )
 
         VNP09GA_directory = abspath(expanduser(VNP09GA_directory))
 
@@ -277,7 +286,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         VCD43NRT_directory = abspath(expanduser(VCD43NRT_directory))
         VCD43NRT_staging_directory = abspath(expanduser(VCD43NRT_staging_directory))
 
-        self.vnp09ga = VNP09GA(
+        self.vnp09ga = product_class(
             working_directory=working_directory,
             download_directory=download_directory,
             products_directory=VNP09GA_directory,
@@ -372,7 +381,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         observation_dates = []
 
         for processing_date in [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]:
-            logger.info(f"retrieving VNP09GA for VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
+            logger.info(f"retrieving {self.vnp09ga.PRODUCT_SHORT_NAME} for VCD43NRT at {cl.place(tile)} on {cl.time(date_UTC)}")
 
             try:
                 granule = self.VNP09GA(processing_date, tile)
