@@ -8,6 +8,7 @@ name = "_brdf_rust"
 crate-type = ["cdylib"]
 
 [dependencies]
+indicatif = "0.17"
 ndarray = "0.16"
 numpy = "0.23"
 pyo3 = { version = "0.23", features = ["extension-module", "abi3-py311"] }
