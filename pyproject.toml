@@ -9,6 +9,7 @@ description = "VIIRS near-real-time BRDF, albedo, and NDVI processing across SNP
 readme = "README.md"
 authors = [
     { name = "Gregory H. Halverson", email = "gregory.h.halverson@jpl.nasa.gov" },
+    { name = "Margaret C. Johnson", email = "maggie.johnson@jpl.nasa.gov" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
