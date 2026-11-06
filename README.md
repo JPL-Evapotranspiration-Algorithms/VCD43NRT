@@ -516,3 +516,17 @@ GDAL - Geospatial Data Abstraction Library: https://gdal.org/
 Xarray - N-dimensional labeled arrays: https://xarray.pydata.org/
 
 NumPy - Numerical computing in Python: https://numpy.org/
+
+## Citation
+
+If you use VCD43NRT in your research, please cite the package using the following BibTeX entry:
+
+```bibtex
+@software{halverson2026vcd43nrt,
+  title={VCD43NRT: VIIRS/NRT BRDF, Albedo, and NDVI Processing Package},
+  author={Halverson, Gregory H. and Johnson, Margaret C.},
+  organization={NASA Jet Propulsion Laboratory},
+  year={2026},
+  url={https://github.com/JPL-Evapotranspiration-Algorithms/VCD43NRT}
+}
+```
