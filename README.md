@@ -21,8 +21,7 @@ NASA Jet Propulsion Laboratory
 The package provides Python-side support for:
 
 - `VCD43NRT`: near-real-time VIIRS/NRT processing and BRDF correction workflow
-- `VNP43IA4`: VIIRS surface reflectance/albedo product interface
-- `VNP43MA3`: VIIRS albedo product support
+- VIIRS source-product APIs for `VNP09GA`, `VJ109GA`, and `VJ209GA`
 
 It includes the supporting utilities needed to:
 
@@ -51,7 +50,9 @@ This package needs:
 
 ## Authentication
 
-The package expects EarthData credentials in `~/.netrc`:
+Earthdata authentication checks `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD`
+environment variables first, then credentials in `~/.netrc`, and finally falls
+back to interactive login. To use `.netrc`, add:
 
 ```text
 machine urs.earthdata.nasa.gov
@@ -61,41 +62,49 @@ password <PASSWORD>
 
 ## Installation
 
-Install a published release on a supported Python/platform combination:
+The most recent release of the Python/Rust hybrid pip package on PyPi can be installed with pip:
 
 ```bash
 pip install VCD43NRT
 ```
 
-Installing from a source checkout builds the Rust extension and requires a Rust toolchain:
+## Development
+
+This Python/Rust hybrid package was developed in a mamba environment `VCD43NRT` that can be reproduced using `environment` make target:
 
 ```bash
-pip install .
+make environment
 ```
 
-The no-toolchain install applies when PyPI has a compatible prebuilt wheel. Unsupported platform/Python combinations and source builds may require Rust.
+Activate the develop environment using mamba:
+
+```bash
+mamba activate VCD43NRT
+```
+
+Install this package in development mode using the `install` make target:
+
+```bash
+make install
+```
 
 ## Tests
 
-For a source checkout, install the development dependencies and run the Python
-and Rust unit tests:
+### Unit Tests
+
+Run the unit tests for this package with the `tests` make target:
 
 ```bash
-python -m pip install -e ".[dev]"
-python -m pytest -q
-cargo test --manifest-path rust/Cargo.toml
+make tests
 ```
 
-To check an existing installation, run the smoke test using its Python
-interpreter from outside the source checkout:
+### Smoke Test
+
+Run the smoke test to confirm the Python-Rust binding in this package using the `smoke-test` make target:
 
 ```bash
-python -I -m VCD43NRT.smoke_test
+make smoke-test
 ```
-
-This imports the installed Rust extension and checks a numerical BRDF fit
-without downloading data or requiring EarthData credentials. It prints the
-extension's path on success and exits with an error on failure.
 
 ## Usage
 
@@ -103,7 +112,9 @@ extension's path on success and exits with an error on failure.
 from VCD43NRT import VCD43NRT, VNP09GA
 ```
 
-The package is designed to be imported as a regular Python module and used from the classes above rather than through the older ECOSTRESS-specific CLI flow.
+The package can be imported as a regular Python module or run through the
+`VCD43NRT` command-line entry point. The examples below show the Python API and
+a single-granule helper script.
 
 ### Single-granule test run
 
@@ -170,7 +181,11 @@ export VCD43NRT_VJ209GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
 
 ## Notes
 
-The former `VCD43NRT` processor import and method remain as deprecated compatibility aliases; new code should use `VCD43NRT`. Existing output directory naming is retained to avoid breaking local caches. This repository supports VIIRS products through Earthaccess/CMR-backed granule discovery and download.
+The former `VNP43NRT` processor class, method, and related directory parameters
+remain as deprecated compatibility aliases; new code should use `VCD43NRT` and
+the `VCD43NRT` directory parameters. Existing output directory naming is
+retained to avoid breaking local caches. This repository supports VIIRS
+products through Earthaccess/CMR-backed granule discovery and download.
 
 ## References
 
