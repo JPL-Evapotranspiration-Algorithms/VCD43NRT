@@ -163,6 +163,51 @@ def test_singular_pixel_fit_fails_with_pixel_index():
         nrt_brdf_all(y, angle, angle, angle, np.array([35.0]))
 
 
+@pytest.mark.parametrize("weighted", [False, True])
+def test_missing_observations_and_minimum_count(weighted):
+    y, sz, vz, rz, noon = _synthetic_inputs()
+    y = np.repeat(y, 3, axis=0)
+    sz, vz, rz = (np.repeat(angle, 3, axis=0) for angle in (sz, vz, rz))
+    y[0, :6] = np.nan
+    y[1, :5] = np.nan
+    y[2, 0] = np.inf
+
+    result = nrt_brdf_all(y, sz, vz, rz, np.repeat(noon, 3), weighted=weighted)
+
+    assert np.isnan(result[0]).all()
+    assert np.isfinite(result[1:]).all()
+    assert result[1:, 8].tolist() == [7, 11]
+    assert result[1:, :3] == pytest.approx(
+        np.tile(nrt_brdf_all(*_synthetic_inputs(), weighted=weighted)[0, :3], (2, 1)),
+        abs=1e-8,
+    )
+
+
+def test_empty_pixels_and_invalid_binding_arguments():
+    empty = np.empty((0, 12), dtype=np.float64)
+    assert nrt_brdf_all(empty, empty, empty, empty, np.empty(0)).shape == (0, 9)
+
+    y, sz, vz, rz, noon = _synthetic_inputs()
+    with pytest.raises(ValueError, match="soz_noon length"):
+        nrt_brdf_all(y, sz, vz, rz, np.empty(0))
+    with pytest.raises(ValueError, match="at least one observation"):
+        nrt_brdf_all(y[:, :0], sz[:, :0], vz[:, :0], rz[:, :0], noon)
+    for scale in (-1.0, np.nan, np.inf):
+        with pytest.raises(ValueError, match="scale"):
+            nrt_brdf_all(y, sz, vz, rz, noon, scale=scale)
+    with pytest.raises(TypeError):
+        nrt_brdf_all(y.astype(np.float32), sz, vz, rz, noon)
+
+
+def test_singular_fit_reports_global_pixel_across_chunks():
+    y, sz, vz, rz, noon = _synthetic_inputs()
+    pixels = 4097
+    y, sz, vz, rz = (np.repeat(array, pixels, axis=0) for array in (y, sz, vz, rz))
+    sz[-1] = vz[-1] = rz[-1] = 20.0
+    with pytest.raises(ValueError, match="pixel 4096"):
+        nrt_brdf_all(y, sz, vz, rz, np.repeat(noon, pixels))
+
+
 def test_rebranded_api_and_legacy_class_alias():
     assert VCD43NRT.__name__ == "VCD43NRT"
     assert issubclass(VNP43NRT, VCD43NRT)
@@ -232,3 +277,5 @@ def test_staged_stack_uses_shared_date_order_and_checks_shapes(tmp_path, monkeyp
     raster_values[str(tmp_path / "2026-10-02_M1.tif")] = np.ones((1, 4))
     with pytest.raises(ValueError, match="expected \\(2, 2\\)"):
         _read_brdf_stack(str(tmp_path), dates, "M1", (2, 2))
+    with pytest.raises(FileNotFoundError, match="missing staged M2 raster for 2026-10-01"):
+        _read_brdf_stack(str(tmp_path), dates, "M2", (2, 2))

@@ -109,19 +109,7 @@ jobs:
         shell: bash
         run: |
           cd "$RUNNER_TEMP"
-          python - <<'PY'
-          import numpy as np
-          from VCD43NRT._brdf_rust import nrt_brdf_all
-
-          observations = 12
-          sz = np.ascontiguousarray(np.linspace(20.0, 43.1, observations).reshape(1, -1))
-          vz = np.ascontiguousarray(np.linspace(3.0, 17.3, observations).reshape(1, -1))
-          rz = np.ascontiguousarray(np.linspace(8.0, 85.0, observations).reshape(1, -1))
-          y = np.ascontiguousarray(0.3 + 0.2 * np.sin(np.deg2rad(sz)) - 0.1 * np.cos(np.deg2rad(rz)))
-          result = nrt_brdf_all(y, sz, vz, rz, np.array([35.0]))
-          assert result.shape == (1, 9)
-          assert result[0, 8] == observations
-          PY
+          python -I -m VCD43NRT.smoke_test
 
   publish:
     name: Publish to PyPI

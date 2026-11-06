@@ -6,15 +6,22 @@ The data-access layer supports Suomi NPP plus equivalent JPSS VIIRS products for
 
 The package uses Python for VIIRS data access, raster preparation, and output writing, and a Rust BRDF solver exposed through PyO3 for array processing.
 
-The older ECOSTRESS L2T/STARS orchestration code and unrelated product-generation infrastructure have been removed so the package matches the current codebase rather than the earlier full pipeline.
+## Contributors 
+
+Gregory H. Halverson (they/them)<br>
+[gregory.h.halverson@jpl.nasa.gov](mailto:gregory.h.halverson@jpl.nasa.gov)<br>
+NASA Jet Propulsion Laboratory
+
+Margaret C. Johnson (she/her)<br>
+[maggie.johnson@jpl.nasa.gov](mailto:maggie.johnson@jpl.nasa.gov)<br>
+NASA Jet Propulsion Laboratory
 
 ## Purpose
 
 The package provides Python-side support for:
 
 - `VCD43NRT`: near-real-time VIIRS/NRT processing and BRDF correction workflow
-- `VNP43IA4`: VIIRS surface reflectance/albedo product interface
-- `VNP43MA3`: VIIRS albedo product support
+- VIIRS source-product APIs for `VNP09GA`, `VJ109GA`, and `VJ209GA`
 
 It includes the supporting utilities needed to:
 
@@ -43,7 +50,9 @@ This package needs:
 
 ## Authentication
 
-The package expects EarthData credentials in `~/.netrc`:
+Earthdata authentication checks `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD`
+environment variables first, then credentials in `~/.netrc`, and finally falls
+back to interactive login. To use `.netrc`, add:
 
 ```text
 machine urs.earthdata.nasa.gov
@@ -53,19 +62,49 @@ password <PASSWORD>
 
 ## Installation
 
-Install a published release on a supported Python/platform combination:
+The most recent release of the Python/Rust hybrid pip package on PyPi can be installed with pip:
 
 ```bash
 pip install VCD43NRT
 ```
 
-Installing from a source checkout builds the Rust extension and requires a Rust toolchain:
+## Development
+
+This Python/Rust hybrid package was developed in a mamba environment `VCD43NRT` that can be reproduced using `environment` make target:
 
 ```bash
-pip install .
+make environment
 ```
 
-The no-toolchain install applies when PyPI has a compatible prebuilt wheel. Unsupported platform/Python combinations and source builds may require Rust.
+Activate the develop environment using mamba:
+
+```bash
+mamba activate VCD43NRT
+```
+
+Install this package in development mode using the `install` make target:
+
+```bash
+make install
+```
+
+## Tests
+
+### Unit Tests
+
+Run the unit tests for this package with the `tests` make target:
+
+```bash
+make tests
+```
+
+### Smoke Test
+
+Run the smoke test to confirm the Python-Rust binding in this package using the `smoke-test` make target:
+
+```bash
+make smoke-test
+```
 
 ## Usage
 
@@ -73,7 +112,9 @@ The no-toolchain install applies when PyPI has a compatible prebuilt wheel. Unsu
 from VCD43NRT import VCD43NRT, VNP09GA
 ```
 
-The package is designed to be imported as a regular Python module and used from the classes above rather than through the older ECOSTRESS-specific CLI flow.
+The package can be imported as a regular Python module or run through the
+`VCD43NRT` command-line entry point. The examples below show the Python API and
+a single-granule helper script.
 
 ### Single-granule test run
 
@@ -140,7 +181,11 @@ export VCD43NRT_VJ209GA_CONCEPT_ID="<CMR_CONCEPT_ID>"
 
 ## Notes
 
-The former `VCD43NRT` processor import and method remain as deprecated compatibility aliases; new code should use `VCD43NRT`. Existing output directory naming is retained to avoid breaking local caches. This repository supports VIIRS products through Earthaccess/CMR-backed granule discovery and download.
+The former `VNP43NRT` processor class, method, and related directory parameters
+remain as deprecated compatibility aliases; new code should use `VCD43NRT` and
+the `VCD43NRT` directory parameters. Existing output directory naming is
+retained to avoid breaking local caches. This repository supports VIIRS
+products through Earthaccess/CMR-backed granule discovery and download.
 
 ## References
 

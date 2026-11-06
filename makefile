@@ -24,6 +24,10 @@ test:
 	cargo test --manifest-path rust/Cargo.toml
 	PYTHONPATH=. pytest
 
+smoke-test:
+	@echo "Running smoke tests..."
+	PYTHONPATH=. python -I -m VCD43NRT.smoke_test
+
 # --- Package Management ---
 
 build:
