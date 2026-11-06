@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "VCD43NRT"
-version = "0.1.0"
+version = "1.0.0"
 description = "VIIRS near-real-time BRDF, albedo, and NDVI processing across SNPP and JPSS missions"
 readme = "README.md"
 authors = [
