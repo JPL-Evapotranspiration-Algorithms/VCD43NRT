@@ -1,3 +1,5 @@
+import pytest
+
 from VCD43NRT.VNP09GA import (
     DEFAULT_MISSION,
     VIIRS_MISSIONS,
@@ -74,3 +76,29 @@ def test_viirs_class_hierarchy():
     assert issubclass(VNP09GA, VIIRS)
     assert issubclass(VJ109GA, VIIRS)
     assert issubclass(VJ209GA, VIIRS)
+
+
+def test_mission_priority_deduplicates_aliases_and_rejects_empty():
+    assert normalize_mission_priority(
+        ["NOAA-20", "JPSS1", "SNPP", "npp"], mission="SNPP", fallback_mode=True
+    ) == ("JPSS1", "SNPP")
+    for priority in ([], "", " , "):
+        with pytest.raises(ValueError, match="mission_priority cannot be empty"):
+            normalize_mission_priority(priority, mission="SNPP", fallback_mode=True)
+    with pytest.raises(ValueError, match="Unknown VIIRS mission"):
+        normalize_mission("unknown")
+
+
+@pytest.mark.parametrize("filename", ["bad.h5", "VJ309GA.A2026283.h08v05.002.2026284000000.h5"])
+def test_invalid_filenames_are_rejected(filename):
+    for parse in (mission_from_filename, modland_tile_from_filename):
+        with pytest.raises(RuntimeError, match="Invalid filename"):
+            parse(filename)
+
+
+def test_concept_id_uses_environment_override(monkeypatch):
+    config = VIIRS_MISSIONS["SNPP"]
+    monkeypatch.delenv(config.concept_id_env, raising=False)
+    assert config.concept_id == config.default_concept_id
+    monkeypatch.setenv(config.concept_id_env, "custom-concept")
+    assert config.concept_id == "custom-concept"

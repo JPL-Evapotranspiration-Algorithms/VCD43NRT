@@ -67,6 +67,28 @@ pip install .
 
 The no-toolchain install applies when PyPI has a compatible prebuilt wheel. Unsupported platform/Python combinations and source builds may require Rust.
 
+## Tests
+
+For a source checkout, install the development dependencies and run the Python
+and Rust unit tests:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest -q
+cargo test --manifest-path rust/Cargo.toml
+```
+
+To check an existing installation, run the smoke test using its Python
+interpreter from outside the source checkout:
+
+```bash
+python -I -m VCD43NRT.smoke_test
+```
+
+This imports the installed Rust extension and checks a numerical BRDF fit
+without downloading data or requiring EarthData credentials. It prints the
+extension's path on success and exits with an error on failure.
+
 ## Usage
 
 ```python
