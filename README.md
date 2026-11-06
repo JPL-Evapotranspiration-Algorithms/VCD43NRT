@@ -6,7 +6,15 @@ The data-access layer supports Suomi NPP plus equivalent JPSS VIIRS products for
 
 The package uses Python for VIIRS data access, raster preparation, and output writing, and a Rust BRDF solver exposed through PyO3 for array processing.
 
-The older ECOSTRESS L2T/STARS orchestration code and unrelated product-generation infrastructure have been removed so the package matches the current codebase rather than the earlier full pipeline.
+## Contributors 
+
+Gregory H. Halverson (they/them)<br>
+[gregory.h.halverson@jpl.nasa.gov](mailto:gregory.h.halverson@jpl.nasa.gov)<br>
+NASA Jet Propulsion Laboratory
+
+Margaret C. Johnson (she/her)<br>
+[maggie.johnson@jpl.nasa.gov](mailto:maggie.johnson@jpl.nasa.gov)<br>
+NASA Jet Propulsion Laboratory
 
 ## Purpose
 
