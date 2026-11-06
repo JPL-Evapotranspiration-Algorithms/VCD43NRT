@@ -19,10 +19,7 @@ import sun_angles
 
 import rasters
 from rasters import Raster, RasterGeometry, Point, Polygon
-try:
-    from .GEOS5FP import GEOS5FP, FailedGEOS5FPDownload
-except ImportError:  # pragma: no cover - legacy direct-import fallback
-    from GEOS5FP import GEOS5FP, FailedGEOS5FPDownload
+from GEOS5FP import GEOS5FP, FailedGEOS5FPDownload
 from modland import find_modland_tiles, parsehv, generate_modland_grid
 
 try:
