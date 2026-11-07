@@ -36,6 +36,7 @@ struct ChunkInput<'a> {
     // Number of temporal observations (swath acquisitions) per pixel
     observation_count: usize,
     // Zero-based index of the first pixel in this chunk relative to the full raster array
+    #[allow(dead_code)]
     first_pixel: usize,
 }
 
