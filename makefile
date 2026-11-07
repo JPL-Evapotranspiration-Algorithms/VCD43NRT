@@ -3,11 +3,11 @@ PACKAGE_NAME = VCD43NRT
 ENVIRONMENT_NAME = $(PACKAGE_NAME)
 DOCKER_IMAGE_NAME = $(shell echo $(PACKAGE_NAME) | tr '[:upper:]' '[:lower:]')
 
-.PHONY: clean test build twine-upload dist install-package install uninstall reinstall environment remove-environment colima-start docker-build docker-build-environment docker-build-installation docker-interactive docker-remove
+.PHONY: clean rust-clean rust-build rust-rebuild test build twine-upload dist install-package install uninstall reinstall environment remove-environment colima-start docker-build docker-build-environment docker-build-installation docker-interactive docker-remove
 
 # --- Cleaning and Maintenance ---
 
-clean:
+clean: rust-clean
 	@echo "Cleaning up build artifacts..."
 	rm -rf *.o *.out *.log
 	rm -rf build/
@@ -15,6 +15,19 @@ clean:
 	rm -rf *.egg-info
 	rm -rf .pytest_cache
 	find . -type d -name "__pycache__" -exec rm -rf {} +
+
+rust-clean:
+	@echo "Cleaning Rust build artifacts..."
+	rm -rf rust/target/
+	rm -f VCD43NRT/_brdf_rust*.so VCD43NRT/_brdf_rust*.pyd
+
+rust-build:
+	@echo "Building and installing the Rust extension in development mode..."
+	python -m maturin develop --manifest-path rust/Cargo.toml
+
+rust-rebuild:
+	$(MAKE) rust-clean
+	$(MAKE) rust-build
 
 # --- Testing ---
 
@@ -41,7 +54,7 @@ twine-upload:
 dist: clean build twine-upload
 	@echo "Distribution process complete."
 
-install-package:
+install-package: rust-build
 	@echo "Installing package in development mode..."
 	python -m pip install -e ".[dev]"
 

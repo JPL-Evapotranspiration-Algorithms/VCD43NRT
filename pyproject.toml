@@ -4,11 +4,12 @@ build-backend = "maturin"
 
 [project]
 name = "VCD43NRT"
-version = "0.1.0"
+version = "1.0.0"
 description = "VIIRS near-real-time BRDF, albedo, and NDVI processing across SNPP and JPSS missions"
 readme = "README.md"
 authors = [
     { name = "Gregory H. Halverson", email = "gregory.h.halverson@jpl.nasa.gov" },
+    { name = "Margaret C. Johnson", email = "maggie.johnson@jpl.nasa.gov" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -53,7 +54,7 @@ features = ["pyo3/extension-module"]
 include = ["VCD43NRT/*.txt"]
 
 [project.urls]
-Homepage = "https://github.com/"
+Homepage = "https://github.com/JPL-Evapotranspiration-Algorithms/VCD43NRT"
 
 [project.scripts]
 VCD43NRT = "VCD43NRT.VCD43NRT:main"
