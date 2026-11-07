@@ -37,13 +37,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install maturin
-          pip install .[dev]
+          pip install -e .[dev]
 
       - name: Run tests
         run: |
           pytest -v
         env:
-          PYTHONPATH: .
           EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
           EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
           SKIP_EARTHDATA_LOGIN: "true"
