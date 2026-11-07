@@ -113,8 +113,7 @@ fn kgeo(sz: f64, vz: f64, rz: f64) -> f64 {
     overlap - sec_sz - sec_vz + 0.5 * (1.0 + cos_epsilon) * sec_sz * sec_vz
 }
 
-// Computes the exact closed-form analytical inverse of a 3x3 symmetric matrix via classical cofactor expansion.
-// Replicates Julia LAPACK (dgetrf/dgetri) conditions: returns None only on exact zero or non-finite determinants.
+// Computes the closed-form analytical inverse of a 3x3 symmetric matrix via classical cofactor expansion.
 #[inline]
 fn inverse_3x3(matrix: [[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
     // Unpack matrix components into individual scalar variables
@@ -130,8 +129,14 @@ fn inverse_3x3(matrix: [[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
     // Compute determinant using Laplace expansion across row 0
     let determinant = a * cofactors[0][0] + b * cofactors[1][0] + c * cofactors[2][0];
 
-    // Reject non-invertible matrices: zero determinant or floating-point overflow/NaN
-    if !determinant.is_finite() || determinant == 0.0 {
+    let matrix_scale = matrix
+        .iter()
+        .flatten()
+        .map(|value| value.abs())
+        .fold(0.0, f64::max);
+
+    // Treat determinants at floating-point precision relative to matrix scale as singular.
+    if !determinant.is_finite() || determinant.abs() <= 16.0 * f64::EPSILON * matrix_scale.powi(3) {
         return None;
     }
 
@@ -160,7 +165,7 @@ fn mat_vec(matrix: [[f64; 3]; 3], vector: [f64; 3]) -> [f64; 3] {
 
 // Executes RTLSR linear kernel inversion across a sub-chunk of spatial pixels.
 // Uses an exponential decay weight over the observation timeline to emphasize recent surface state changes.
-fn process_chunk(input: ChunkInput<'_>, weighted: bool, scale: f64) -> Vec<f64> {
+fn process_chunk(input: ChunkInput<'_>, weighted: bool, scale: f64) -> Result<Vec<f64>, usize> {
     // Destructure chunk input parameters
     let ChunkInput {
         reflectance,
@@ -170,7 +175,7 @@ fn process_chunk(input: ChunkInput<'_>, weighted: bool, scale: f64) -> Vec<f64> 
         solar_noon,
         pixel_count,
         observation_count,
-        first_pixel: _,
+        first_pixel,
     } = input;
 
     // Allocate flat destination vector initialized to NaN for all output metrics across all pixels
@@ -256,9 +261,9 @@ fn process_chunk(input: ChunkInput<'_>, weighted: bool, scale: f64) -> Vec<f64> 
         }
 
         // Invert the 3x3 normal matrix to retrieve parameter covariance matrix: Cov = (X^T * W * X)^(-1)
-        // If collinear viewing geometry renders matrix singular, leave pixel as NaN to mirror Julia behavior
+        // A fit with degenerate viewing geometry cannot produce meaningful BRDF coefficients.
         let Some(covariance) = inverse_3x3(normal) else {
-            continue;
+            return Err(first_pixel + pixel);
         };
 
         // Solve for BRDF kernel weights: f = Cov * rhs = [f_iso, f_vol, f_geo]
@@ -371,7 +376,7 @@ fn process_chunk(input: ChunkInput<'_>, weighted: bool, scale: f64) -> Vec<f64> 
         row[8] = count as f64; // Band 8: Valid observation count (nt)
     }
 
-    output
+    Ok(output)
 }
 
 // Verifies that input NumPy ndarrays possess C-contiguous standard memory layout
@@ -498,6 +503,9 @@ fn nrt_brdf_all<'py>(
                 scale,
             )
         });
+        let computed = computed.map_err(|pixel| {
+            PyValueError::new_err(format!("singular BRDF fit for pixel {pixel}"))
+        })?;
 
         // Advance progress bar by chunk size
         if let Some(ref bar) = pb {
