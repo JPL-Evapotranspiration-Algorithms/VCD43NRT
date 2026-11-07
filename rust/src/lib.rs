@@ -103,7 +103,7 @@ fn kgeo(sz: f64, vz: f64, rz: f64) -> f64 {
     let cos_t = (2.0 * (distance.powi(2) + (tan_sz * tan_vz * rz.sin()).powi(2)).sqrt()
         / (sec_sz + sec_vz))
         .clamp(-1.0, 1.0); // Clamped to [-1.0, 1.0] matching Julia Kgeo_sc clamp(cost, -1.0, 1.0)
-    // Angle describing proportion of mutual shadow overlap
+                           // Angle describing proportion of mutual shadow overlap
     let t = cos_t.acos();
     // Normalized overlap area function O(sz, vz, rz)
     let overlap = ((t - t.sin() * t.cos()) / std::f64::consts::PI * (sec_sz + sec_vz)).max(0.0);
@@ -360,15 +360,15 @@ fn process_chunk(input: ChunkInput<'_>, weighted: bool, scale: f64) -> Vec<f64> 
 
         // Populate destination output row for the current pixel
         let row = &mut output[pixel * OUTPUT_COLUMNS..(pixel + 1) * OUTPUT_COLUMNS];
-        row[0] = dot3(wsa, coefficients);    // Band 0: White-Sky Albedo (WSA)
-        row[1] = dot3(bsa, coefficients);    // Band 1: Black-Sky Albedo (BSA)
-        row[2] = dot3(nadir, coefficients);  // Band 2: Nadir BRDF-Adjusted Reflectance (NBAR)
-        row[3] = wsa_se;                     // Band 3: WSA Standard Error
-        row[4] = bsa_se;                     // Band 4: BSA Standard Error
-        row[5] = nadir_se;                   // Band 5: NBAR Standard Error
-        row[6] = standard_error;             // Band 6: Regression Model Standard Error (RMSE)
-        row[7] = r_squared;                  // Band 7: Regression R^2
-        row[8] = count as f64;               // Band 8: Valid observation count (nt)
+        row[0] = dot3(wsa, coefficients); // Band 0: White-Sky Albedo (WSA)
+        row[1] = dot3(bsa, coefficients); // Band 1: Black-Sky Albedo (BSA)
+        row[2] = dot3(nadir, coefficients); // Band 2: Nadir BRDF-Adjusted Reflectance (NBAR)
+        row[3] = wsa_se; // Band 3: WSA Standard Error
+        row[4] = bsa_se; // Band 4: BSA Standard Error
+        row[5] = nadir_se; // Band 5: NBAR Standard Error
+        row[6] = standard_error; // Band 6: Regression Model Standard Error (RMSE)
+        row[7] = r_squared; // Band 7: Regression R^2
+        row[8] = count as f64; // Band 8: Valid observation count (nt)
     }
 
     output
