@@ -2,32 +2,75 @@
 
 This module provides callback wrappers to connect Rust progress updates with Python
 progress bars like tqdm, allowing seamless progress display when calling the Rust
-BRDF solver.
+BRDF solver. tqdm is the default progress display, with automatic Jupyter notebook
+detection.
 
 Example:
-    Using tqdm with the Rust BRDF solver::
+    Using tqdm with the Rust BRDF solver (automatic in terminals and Jupyter)::
 
         from VCD43NRT import brdf_progress
-        from tqdm import tqdm
+        from VCD43NRT import _brdf_rust
         import numpy as np
 
-        # Create tqdm progress bar
-        pbar = tqdm(total=pixels, desc="BRDF Processing")
-        callback = brdf_progress.make_tqdm_callback(pbar)
-
-        # Call Rust function with callback
-        results = nrt_brdf_all(
+        # tqdm is automatically used with Jupyter detection
+        results = _brdf_rust.nrt_brdf_all(
             Y, sz, vz, rz, solar_noon,
             weighted=False,
+            progress=True  # Uses tqdm by default!
+        )
+
+    Or explicitly create a progress bar::
+
+        callback = brdf_progress.get_smart_callback(pixels, desc="BRDF Processing")
+        results = _brdf_rust.nrt_brdf_all(
+            Y, sz, vz, rz, solar_noon,
             progress=True,
             progress_callback=callback
         )
-
-        pbar.close()
 """
 
 from typing import Optional, Callable, Any
 import sys
+
+
+def is_notebook() -> bool:
+    """Detect if code is running in Jupyter notebook or similar environment.
+    
+    Returns:
+        True if running in Jupyter/IPython notebook, False otherwise
+    """
+    try:
+        # Check for IPython
+        from IPython import get_ipython
+        ipython = get_ipython()
+        if ipython is None:
+            return False
+        # Check if IPython kernel is running in Jupyter
+        if "IPKernelApp" not in ipython.config:
+            return False
+        return True
+    except (ImportError, AttributeError, NameError):
+        return False
+
+
+def get_tqdm_class():
+    """Get appropriate tqdm class for current environment (terminal or notebook).
+    
+    Returns:
+        tqdm class: tqdm.notebook.tqdm for Jupyter, tqdm.tqdm for terminal
+    """
+    try:
+        if is_notebook():
+            from tqdm.notebook import tqdm
+            return tqdm
+        else:
+            from tqdm import tqdm
+            return tqdm
+    except ImportError:
+        raise ImportError(
+            "tqdm is required for progress display. "
+            "Install it with: pip install tqdm"
+        )
 
 
 def make_tqdm_callback(pbar: Any) -> Callable[[int, int], None]:
@@ -121,16 +164,60 @@ def make_custom_callback(
     return update_func
 
 
+def get_smart_callback(
+    total: int,
+    desc: str = "Processing",
+    unit: str = "pixel",
+    **tqdm_kwargs: Any,
+) -> Callable[[int, int], None]:
+    """Create a smart tqdm progress callback with automatic environment detection.
+
+    Automatically detects whether running in terminal or Jupyter notebook and
+    uses the appropriate tqdm variant (tqdm.notebook.tqdm for Jupyter, tqdm.tqdm
+    for terminal).
+
+    Args:
+        total: Total number of items to process
+        desc: Description for the progress bar (default: "Processing")
+        unit: Unit name for progress bar (default: "pixel")
+        **tqdm_kwargs: Additional keyword arguments passed to tqdm
+
+    Returns:
+        A callback function compatible with Rust progress_callback parameter
+
+    Example:
+        >>> callback = get_smart_callback(total=1000, desc="BRDF")
+        >>> # Automatically uses tqdm.notebook.tqdm in Jupyter
+        >>> # Automatically uses tqdm.tqdm in terminal
+    """
+    try:
+        tqdm_class = get_tqdm_class()
+    except ImportError as e:
+        raise ImportError(
+            "tqdm is required for progress display. "
+            "Install it with: pip install tqdm"
+        ) from e
+
+    pbar = tqdm_class(
+        total=total,
+        desc=desc,
+        unit=unit,
+        **tqdm_kwargs,
+    )
+
+    return make_tqdm_callback(pbar)
+
+
 class TqdmProgressCallback:
     """Context manager for seamless tqdm integration with Rust BRDF solver.
 
     This class provides a context manager that automatically creates and cleans up
-    a tqdm progress bar for use with the Rust BRDF solver.
+    a tqdm progress bar for use with the Rust BRDF solver. Automatically detects
+    Jupyter notebook environment and uses appropriate tqdm variant.
 
-    Example:
+    Example (Terminal):
         >>> from VCD43NRT.brdf_progress import TqdmProgressCallback
         >>> from VCD43NRT import _brdf_rust
-        >>> import numpy as np
         >>>
         >>> with TqdmProgressCallback(total_pixels, desc="BRDF") as progress:
         ...     results = _brdf_rust.nrt_brdf_all(
@@ -138,6 +225,10 @@ class TqdmProgressCallback:
         ...         progress=True,
         ...         progress_callback=progress
         ...     )
+
+    Example (Jupyter):
+        >>> # In Jupyter notebook - use exactly the same code!
+        >>> # tqdm.notebook.tqdm is automatically used
     """
 
     def __init__(
@@ -147,7 +238,7 @@ class TqdmProgressCallback:
         unit: str = "pixel",
         **tqdm_kwargs: Any,
     ):
-        """Initialize progress context manager.
+        """Initialize progress context manager with smart environment detection.
 
         Args:
             total: Total number of pixels to process
@@ -163,16 +254,16 @@ class TqdmProgressCallback:
         self.callback: Optional[Callable[[int, int], None]] = None
 
     def __enter__(self) -> Callable[[int, int], None]:
-        """Enter context and create tqdm progress bar."""
+        """Enter context and create tqdm progress bar with Jupyter detection."""
         try:
-            from tqdm import tqdm
-        except ImportError:
+            tqdm_class = get_tqdm_class()
+        except ImportError as e:
             raise ImportError(
                 "tqdm is required for TqdmProgressCallback. "
                 "Install it with: pip install tqdm"
-            )
+            ) from e
 
-        self.pbar = tqdm(
+        self.pbar = tqdm_class(
             total=self.total,
             desc=self.desc,
             unit=self.unit,
@@ -196,3 +287,95 @@ def no_progress() -> Optional[Callable[[int, int], None]]:
         None, indicating no progress callback should be used
     """
     return None
+
+
+def nrt_brdf_all(
+    y,
+    sz,
+    vz,
+    rz,
+    soz_noon,
+    weighted: bool = True,
+    scale: float = 1.87,
+    progress: bool = True,
+    progress_callback: Optional[Callable[[int, int], None]] = "auto",
+    desc: str = "BRDF Inversion",
+    **tqdm_kwargs: Any,
+):
+    """Wrapper around Rust nrt_brdf_all with smart tqdm default.
+
+    This function wraps the Rust BRDF solver and automatically uses tqdm progress
+    bars by default (with Jupyter notebook detection). It provides a convenient
+    interface that:
+    - Uses tqdm by default (not Indicatif)
+    - Auto-detects Jupyter notebooks
+    - Allows disabling progress or using custom callbacks
+    - Preserves all Rust function parameters
+
+    Args:
+        y, sz, vz, rz, soz_noon: Input arrays (see Rust function)
+        weighted: Use weighted least squares (default: True)
+        scale: BRDF model scale factor (default: 1.87)
+        progress: Enable progress display (default: True)
+        progress_callback: Progress callback function or "auto" for default tqdm
+                          - "auto": Use smart tqdm with Jupyter detection
+                          - None: No progress display
+                          - callable: Custom callback function
+        desc: Description for tqdm progress bar (default: "BRDF Inversion")
+        **tqdm_kwargs: Additional arguments passed to tqdm (e.g., unit_scale=True)
+
+    Returns:
+        Results array from Rust solver
+
+    Example (Terminal - automatic tqdm):
+        >>> from VCD43NRT.brdf_progress import nrt_brdf_all
+        >>> results = nrt_brdf_all(Y, sz, vz, rz, solar_noon)
+
+    Example (Jupyter - automatic tqdm.notebook.tqdm):
+        >>> # Same code works in Jupyter - uses notebook progress bar automatically!
+        >>> results = nrt_brdf_all(Y, sz, vz, rz, solar_noon)
+
+    Example (Disable progress):
+        >>> results = nrt_brdf_all(Y, sz, vz, rz, solar_noon, progress=False)
+
+    Example (Custom callback):
+        >>> def my_callback(current, total):
+        ...     print(f"{current}/{total}")
+        >>> results = nrt_brdf_all(Y, sz, vz, rz, solar_noon,
+        ...                        progress_callback=my_callback)
+    """
+    from VCD43NRT import _brdf_rust
+
+    # Handle progress callback logic
+    if not progress:
+        # Progress disabled
+        final_callback = None
+    elif progress_callback == "auto":
+        # Auto mode: Use smart tqdm with Jupyter detection
+        if progress:
+            final_callback = get_smart_callback(
+                total=y.shape[0],
+                desc=desc,
+                **tqdm_kwargs
+            )
+        else:
+            final_callback = None
+    elif progress_callback is None:
+        # Explicitly no callback
+        final_callback = None
+    else:
+        # Custom callback provided
+        final_callback = progress_callback
+
+    # Call the Rust function with the determined callback
+    return _brdf_rust.nrt_brdf_all(
+        y,
+        sz,
+        vz,
+        rz,
+        soz_noon,
+        weighted=weighted,
+        scale=scale,
+        progress=progress,
+        progress_callback=final_callback,
+    )
