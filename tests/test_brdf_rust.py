@@ -3,6 +3,7 @@ import os
 import select
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -128,6 +129,18 @@ module.nrt_brdf_all(data, data, data, data, np.zeros(1), progress=sys.argv[2] ==
 
     assert ("1/1" in output) is progress
     assert b"1/1" not in result.stderr
+
+
+def test_synthetic_progress_script():
+    result = subprocess.run(
+        [sys.executable, "-m", "examples.test_brdf_progress", "--pixels", "8193"],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    assert "Rust BRDF progress test passed" in result.stdout
 
 
 @pytest.mark.parametrize("weighted", [False, True])

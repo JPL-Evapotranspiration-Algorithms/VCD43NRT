@@ -106,6 +106,16 @@ Run the smoke test to confirm the Python-Rust binding in this package using the 
 make smoke-test
 ```
 
+For a longer synthetic-data test of the Rust binding and progress bar, run
+this in a terminal after installing the package:
+
+```bash
+python examples/test_brdf_progress.py
+```
+
+Use `--pixels 1000000` to increase the workload if the default finishes too
+quickly to observe the bar.
+
 ## Usage
 
 ```python
