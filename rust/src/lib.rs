@@ -1,4 +1,4 @@
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use ndarray::Array2;
 use numpy::{IntoPyArray, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
@@ -458,7 +458,8 @@ fn nrt_brdf_all<'py>(
 
     // Initialize Indicatif progress bar if progress display is requested
     let pb = if progress {
-        let bar = ProgressBar::new(pixel_count as u64);
+        let bar =
+            ProgressBar::with_draw_target(Some(pixel_count as u64), ProgressDrawTarget::stdout());
         bar.set_style(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({percent}%) [ETA: {eta}]")

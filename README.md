@@ -116,6 +116,10 @@ The package can be imported as a regular Python module or run through the
 `VCD43NRT` command-line entry point. The examples below show the Python API and
 a single-granule helper script.
 
+The Rust BRDF solver displays progress on stdout when stdout is an interactive
+terminal. Indicatif hides the bar when stdout is redirected or captured; the
+low-level `nrt_brdf_all` function also accepts `progress=False` to disable it.
+
 ### Quick Start
 
 #### Basic Initialization

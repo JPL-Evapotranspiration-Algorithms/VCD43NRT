@@ -1,9 +1,14 @@
 import importlib
+import os
+import select
+import subprocess
+import sys
 
 import numpy as np
 import pytest
 
 from VCD43NRT import VCD43NRT, VNP43NRT
+from VCD43NRT import _brdf_rust
 from VCD43NRT._brdf_rust import nrt_brdf_all
 from VCD43NRT.VCD43NRT import _read_brdf_stack
 
@@ -90,6 +95,39 @@ def test_pyo3_solver_returns_expected_shape_and_finite_solution():
         np.dot(nadir, coefficients),
     ]
     assert results[0, :3] == pytest.approx(expected, abs=1e-10)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="requires a pseudo-terminal")
+@pytest.mark.parametrize("progress", [True, False])
+def test_progress_uses_stdout_terminal(progress):
+    import pty
+
+    script = """
+import importlib.util
+import numpy as np
+import sys
+spec = importlib.util.spec_from_file_location("_brdf_rust", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+data = np.zeros((1, 1))
+module.nrt_brdf_all(data, data, data, data, np.zeros(1), progress=sys.argv[2] == "True")
+"""
+    master, slave = pty.openpty()
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script, _brdf_rust.__file__, str(progress)],
+            stdout=slave,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=30,
+        )
+        output = os.read(master, 8192).decode() if select.select([master], [], [], 0)[0] else ""
+    finally:
+        os.close(master)
+        os.close(slave)
+
+    assert ("1/1" in output) is progress
+    assert b"1/1" not in result.stderr
 
 
 @pytest.mark.parametrize("weighted", [False, True])
