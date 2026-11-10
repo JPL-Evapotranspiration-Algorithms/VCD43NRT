@@ -106,6 +106,16 @@ Run the smoke test to confirm the Python-Rust binding in this package using the 
 make smoke-test
 ```
 
+For a longer synthetic-data test of the Rust binding and progress bar, run
+this in a terminal after installing the package:
+
+```bash
+python examples/test_brdf_progress.py
+```
+
+Use `--pixels 1000000` to increase the workload if the default finishes too
+quickly to observe the bar.
+
 ## Usage
 
 ```python
@@ -115,6 +125,10 @@ from VCD43NRT import VCD43NRT, VNP09GA
 The package can be imported as a regular Python module or run through the
 `VCD43NRT` command-line entry point. The examples below show the Python API and
 a single-granule helper script.
+
+The Rust BRDF solver displays progress on stdout when stdout is an interactive
+terminal. Indicatif hides the bar when stdout is redirected or captured; the
+low-level `nrt_brdf_all` function also accepts `progress=False` to disable it.
 
 ### Quick Start
 

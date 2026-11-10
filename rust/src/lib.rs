@@ -1,4 +1,4 @@
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use ndarray::Array2;
 use numpy::{IntoPyArray, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
@@ -391,7 +391,7 @@ fn ensure_standard_layout<T>(array: &ndarray::ArrayView2<'_, T>, name: &str) -> 
 
 // PyO3-exposed function performing NRT BRDF inversion across an entire raster swath
 #[allow(clippy::too_many_arguments)]
-#[pyfunction(signature = (y, sz, vz, rz, soz_noon, weighted=true, scale=1.87, progress=true))]
+#[pyfunction(signature = (y, sz, vz, rz, soz_noon, weighted=true, scale=1.87, progress=true, progress_callback=None))]
 fn nrt_brdf_all<'py>(
     py: Python<'py>,
     y: PyReadonlyArray2<'py, f64>,
@@ -402,6 +402,7 @@ fn nrt_brdf_all<'py>(
     weighted: bool,
     scale: f64,
     progress: bool,
+    progress_callback: Option<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, numpy::PyArray2<f64>>> {
     // Acquire read-only ndarray views from Python array objects
     let y_view = y.as_array();
@@ -456,9 +457,11 @@ fn nrt_brdf_all<'py>(
     // Allocate continuous container for the accumulated output matrix
     let mut results = Vec::with_capacity(pixel_count * OUTPUT_COLUMNS);
 
-    // Initialize Indicatif progress bar if progress display is requested
-    let pb = if progress {
-        let bar = ProgressBar::new(pixel_count as u64);
+    // Initialize progress tracking: either with Indicatif or Python callback
+    let use_callback = progress && progress_callback.is_some();
+    let pb = if progress && !use_callback {
+        let bar =
+            ProgressBar::with_draw_target(Some(pixel_count as u64), ProgressDrawTarget::stdout());
         bar.set_style(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({percent}%) [ETA: {eta}]")
@@ -469,6 +472,8 @@ fn nrt_brdf_all<'py>(
     } else {
         None
     };
+
+    let mut processed = 0;
 
     // Iterate through total raster pixels in bounded chunks
     for start in (0..pixel_count).step_by(PIXEL_CHUNK_SIZE) {
@@ -507,8 +512,13 @@ fn nrt_brdf_all<'py>(
             PyValueError::new_err(format!("singular BRDF fit for pixel {pixel}"))
         })?;
 
-        // Advance progress bar by chunk size
-        if let Some(ref bar) = pb {
+        // Update progress via callback or indicatif
+        processed += chunk_pixels;
+        if use_callback {
+            if let Some(ref callback) = progress_callback {
+                callback.call1((processed as i64, pixel_count as i64))?;
+            }
+        } else if let Some(ref bar) = pb {
             bar.inc(chunk_pixels as u64);
         }
 

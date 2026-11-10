@@ -1,6 +1,7 @@
 # Define package and environment variables
 PACKAGE_NAME = VCD43NRT
 ENVIRONMENT_NAME = $(PACKAGE_NAME)
+PYTHON_VERSION ?= 3.14
 DOCKER_IMAGE_NAME = $(shell echo $(PACKAGE_NAME) | tr '[:upper:]' '[:lower:]')
 
 .PHONY: clean rust-clean rust-build rust-rebuild test build twine-upload dist install-package install uninstall reinstall environment remove-environment colima-start docker-build docker-build-environment docker-build-installation docker-interactive docker-remove
@@ -72,7 +73,7 @@ reinstall: uninstall install
 
 environment:
 	@echo "Creating mamba environment: $(ENVIRONMENT_NAME)..."
-	mamba create -y -n $(ENVIRONMENT_NAME) -c conda-forge python=3.11 rust
+	mamba create -y -n $(ENVIRONMENT_NAME) -c conda-forge python=$(PYTHON_VERSION) rust maturin
 
 remove-environment:
 	@echo "Removing mamba environment: $(ENVIRONMENT_NAME)..."

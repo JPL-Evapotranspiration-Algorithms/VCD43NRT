@@ -4,6 +4,7 @@ from .VIIRS import VIIRS
 from .VNP09GA import VNP09GA
 from .VJ109GA import VJ109GA
 from .VJ209GA import VJ209GA
+from . import brdf_progress
 
 __all__ = [
     "__version__",
@@ -16,4 +17,5 @@ __all__ = [
     "VNP09GA",
     "VJ109GA",
     "VJ209GA",
+    "brdf_progress",
 ]
