@@ -53,6 +53,11 @@ module-name = "VCD43NRT._brdf_rust"
 features = ["pyo3/extension-module"]
 include = ["VCD43NRT/*.txt"]
 
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
 [project.urls]
 Homepage = "https://github.com/JPL-Evapotranspiration-Algorithms/VCD43NRT"
 
