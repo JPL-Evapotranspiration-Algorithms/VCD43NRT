@@ -133,7 +133,7 @@ module.nrt_brdf_all(data, data, data, data, np.zeros(1), progress=sys.argv[2] ==
 
 def test_synthetic_progress_script():
     result = subprocess.run(
-        [sys.executable, "-m", "examples.test_brdf_progress", "--pixels", "8193"],
+        [sys.executable, "-m", "examples.brdf_progress_test_usage", "--pixels", "8193"],
         cwd=Path(__file__).resolve().parents[1],
         capture_output=True,
         text=True,
