@@ -1,6 +1,6 @@
 # VCD43NRT
 
-VCD43NRT is a Python package for VIIRS/NRT data access and BRDF, albedo, and NDVI processing. The algorithm is exposed through the `VCD43NRT` processor class; VIIRS source-product APIs such as `VNP09GA`, `VJ109GA`, and `VJ209GA` retain their NASA product names.
+`VCD43NRT` is a Python package for VIIRS near real time (NRT) data access and BRDF, albedo, and NDVI processing. The algorithm is exposed through the `VCD43NRT` processor class; VIIRS source-product APIs such as `VNP09GA`, `VJ109GA`, and `VJ209GA` retain their NASA product names.
 
 The data-access layer supports Suomi NPP plus equivalent JPSS VIIRS products for JPSS-1 and JPSS-2 through mission selection and mission-priority fallback.
 
