@@ -52,8 +52,15 @@ from rasters import Raster, RasterGeometry, Point, Polygon
 from GEOS5FP import GEOS5FP, FailedGEOS5FPDownload
 from modland import find_modland_tiles, parsehv, generate_modland_grid
 
-try:
-    from ._brdf_rust import nrt_brdf_all
+if __package__:
+    try:
+        from ._brdf_rust import nrt_brdf_all
+    except ImportError as exc:
+        raise ImportError(
+            "Failed to import compiled Rust extension 'VCD43NRT._brdf_rust'. "
+            "Build it in editable mode with 'make rust-build' (or 'maturin develop --manifest-path rust/Cargo.toml'), "
+            "or install a prebuilt wheel matching your Python version and platform."
+        ) from exc
     from .BRDF import bidirectional_reflectance
     from .VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI
     from .VNP09GA import VNP09GA
@@ -62,7 +69,7 @@ try:
     from .VIIRS_granule import ALBEDO_COLORMAP, NDVI_COLORMAP
     from .VIIRS import VIIRSUnavailableError
     from .VIIRS_missions import normalize_mission
-except ImportError:  # pragma: no cover - legacy direct-import fallback
+else:  # pragma: no cover - direct script execution fallback
     from _brdf_rust import nrt_brdf_all
     from BRDF import bidirectional_reflectance
     from VIIRSDownloader import VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI

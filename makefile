@@ -4,7 +4,7 @@ ENVIRONMENT_NAME = $(PACKAGE_NAME)
 PYTHON_VERSION ?= 3.14
 DOCKER_IMAGE_NAME = $(shell echo $(PACKAGE_NAME) | tr '[:upper:]' '[:lower:]')
 
-.PHONY: clean rust-clean rust-build rust-rebuild test build twine-upload dist install-package install uninstall reinstall environment remove-environment colima-start docker-build docker-build-environment docker-build-installation docker-interactive docker-remove
+.PHONY: clean rust-clean rust-build rust-rebuild test wheel-test build twine-upload dist install-package install uninstall reinstall environment remove-environment colima-start docker-build docker-build-environment docker-build-installation docker-interactive docker-remove
 
 # --- Cleaning and Maintenance ---
 
@@ -23,8 +23,8 @@ rust-clean:
 	rm -f VCD43NRT/_brdf_rust*.so VCD43NRT/_brdf_rust*.pyd
 
 rust-build:
-	@echo "Building and installing the Rust extension in development mode..."
-	python -m maturin develop --manifest-path rust/Cargo.toml
+	@echo "Building and installing the Rust extension and dev dependencies..."
+	python -m maturin develop --manifest-path rust/Cargo.toml --extras dev
 
 rust-rebuild:
 	$(MAKE) rust-clean
@@ -32,7 +32,7 @@ rust-rebuild:
 
 # --- Testing ---
 
-test:
+test: rust-build
 	@echo "Running tests..."
 	cargo fmt --manifest-path rust/Cargo.toml -- --check
 	cargo test --manifest-path rust/Cargo.toml
@@ -56,8 +56,7 @@ dist: clean build twine-upload
 	@echo "Distribution process complete."
 
 install-package: rust-build
-	@echo "Installing package in development mode..."
-	python -m pip install -e ".[dev]"
+	@echo "Development package and Rust extension installed."
 
 install: install-package
 	@echo "Package installed; source builds require a Rust toolchain."
@@ -73,7 +72,7 @@ reinstall: uninstall install
 
 environment:
 	@echo "Creating mamba environment: $(ENVIRONMENT_NAME)..."
-	mamba create -y -n $(ENVIRONMENT_NAME) -c conda-forge python=$(PYTHON_VERSION) rust maturin
+	mamba create -y -n $(ENVIRONMENT_NAME) -c conda-forge python=$(PYTHON_VERSION) pip "setuptools<81" rust maturin
 
 remove-environment:
 	@echo "Removing mamba environment: $(ENVIRONMENT_NAME)..."
@@ -104,3 +103,13 @@ docker-interactive:
 docker-remove:
 	@echo "Removing Docker image: $(DOCKER_IMAGE_NAME)..."
 	docker rmi -f $(DOCKER_IMAGE_NAME)
+
+wheel-test:
+	@echo "Building release wheel and running isolated smoke test..."
+	rm -rf dist/
+	python -m maturin build --release --manifest-path rust/Cargo.toml --out dist
+	python -m venv /tmp/vcd43nrt_wheel_verify
+	/tmp/vcd43nrt_wheel_verify/bin/pip install --upgrade pip
+	/tmp/vcd43nrt_wheel_verify/bin/pip install dist/*.whl
+	cd /tmp && /tmp/vcd43nrt_wheel_verify/bin/python -I -m VCD43NRT.smoke_test
+	rm -rf /tmp/vcd43nrt_wheel_verify
