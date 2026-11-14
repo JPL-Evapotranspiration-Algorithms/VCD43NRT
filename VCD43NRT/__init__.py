@@ -1,3 +1,11 @@
+try:
+    from . import _brdf_rust
+except ImportError as exc:
+    raise ImportError(
+        "VCD43NRT requires the compiled '_brdf_rust' extension. "
+        "Run 'make install' or 'maturin develop --manifest-path rust/Cargo.toml' in a source checkout."
+    ) from exc
+
 from .version import __version__, __author__
 from .VCD43NRT import VCD43NRT, VCD43NRTGranule, VNP43NRT, VNP43NRTGranule
 from .VIIRS import VIIRS
