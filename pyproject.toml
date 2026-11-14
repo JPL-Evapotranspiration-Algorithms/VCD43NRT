@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "VCD43NRT"
-version = "1.3.0"
+version = "1.3.1"
 description = "VIIRS near-real-time BRDF, albedo, and NDVI processing across SNPP and JPSS missions"
 readme = "README.md"
 authors = [
@@ -17,25 +17,25 @@ classifiers = [
     "Programming Language :: Rust",
 ]
 dependencies = [
-    "beautifulsoup4",
+    "beautifulsoup4>=4.12",
     "colored-logging~=1.1.0",
-    "earthaccess",
+    "earthaccess~=0.9.0",
     "GEOS5FP~=2.23.0",
-    "h5py",
-    "matplotlib",
-    "modland",
-    "numpy",
-    "pandas",
-    "python-dateutil",
-    "pytictoc",
-    "rasters",
-    "requests",
-    "scikit-image",
-    "shapely",
-    "sun-angles",
-    "xmltodict",
+    "h5py>=3.14.0",
+    "matplotlib~=3.10.9",
+    "modland~=1.1.2",
+    "numpy>=2,<2.6",
+    "pandas~=3.1.1",
+    "python-dateutil~=2.9.0",
+    "pytictoc~=1.5.3",
+    "rasters~=1.20.0",
+    "requests>=2.32",
+    "scikit-image~=0.26.0",
+    "shapely~=2.2.0",
+    "sun-angles~=1.7.0",
+    "xmltodict~=1.0.4",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 [project.optional-dependencies]
 dev = [
