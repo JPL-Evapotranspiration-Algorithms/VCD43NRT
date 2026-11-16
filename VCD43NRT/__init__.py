@@ -6,7 +6,15 @@ except ImportError as exc:
         "Run 'make install' or 'maturin develop --manifest-path rust/Cargo.toml' in a source checkout."
     ) from exc
 
-from .version import __version__, __author__
+from .version import __version__
+from .exceptions import (
+    VCD43NRTError,
+    CMRServerUnreachable,
+    DownloadFailed,
+    AuxiliaryDownloadFailed,
+    VIIRSUnavailableError,
+    BRDFRetrievalFailed,
+)
 from .VCD43NRT import VCD43NRT, VCD43NRTGranule, VNP43NRT, VNP43NRTGranule
 from .VIIRS import VIIRS
 from .VNP09GA import VNP09GA
@@ -16,7 +24,12 @@ from . import brdf_progress
 
 __all__ = [
     "__version__",
-    "__author__",
+    "VCD43NRTError",
+    "CMRServerUnreachable",
+    "DownloadFailed",
+    "AuxiliaryDownloadFailed",
+    "VIIRSUnavailableError",
+    "BRDFRetrievalFailed",
     "VCD43NRT",
     "VCD43NRTGranule",
     "VNP43NRT",

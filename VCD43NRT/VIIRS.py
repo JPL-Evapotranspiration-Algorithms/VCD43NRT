@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import tempfile
 from datetime import date
 from os.path import abspath, expanduser, join
@@ -7,11 +8,20 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import earthaccess
+import h5py
 import pandas as pd
 from dateutil import parser
 from rasters import Point, Polygon, RasterGeometry
 
 from .constants import RETRIES, WORKING_DIRECTORY
+from .exceptions import (
+    AuxiliaryDownloadFailed,
+    BRDFRetrievalFailed,
+    CMRServerUnreachable,
+    DownloadFailed,
+    VCD43NRTError,
+    VIIRSUnavailableError,
+)
 from .VIIRS_missions import (
     DEFAULT_MISSION,
     VIIRS_MISSIONS,
@@ -32,12 +42,13 @@ except ImportError:  # pragma: no cover - legacy direct-import fallback
 logger = logging.getLogger(__name__)
 
 
-class DownloadFailed(ConnectionError):
-    pass
-
-
-class VIIRSUnavailableError(Exception):
-    pass
+def _validate_hdf5_file(filepath: Path) -> None:
+    if not filepath.exists():
+        raise FileNotFoundError(f"Downloaded file does not exist: {filepath}")
+    if filepath.stat().st_size <= 0:
+        raise ValueError(f"Downloaded file is empty: {filepath}")
+    with h5py.File(filepath, "r") as handle:
+        list(handle.keys())
 
 
 class VIIRS:
@@ -230,21 +241,34 @@ class VIIRS:
                 download_exception = None
                 downloaded_granules = []
 
-                file_paths = earthaccess.download(granules_to_download, local_path=temporary_download_directory)
+                try:
+                    file_paths = earthaccess.download(granules_to_download, local_path=temporary_download_directory)
+                except Exception as exc:
+                    download_exception = exc
+                    file_paths = []
 
-                for granule, download_file_path in zip(granules_to_download, file_paths):
-                    if isinstance(download_file_path, Exception):
-                        if download_exception is None:
-                            download_exception = download_file_path
-                        continue
+                if download_exception is None:
+                    for granule, download_file_path in zip(granules_to_download, file_paths):
+                        if isinstance(download_file_path, Exception):
+                            if download_exception is None:
+                                download_exception = download_file_path
+                            continue
 
-                    download_file_path = Path(download_file_path)
-                    output_file_path = self._download_output_path(granule)
-                    Path(output_file_path).parent.mkdir(parents=True, exist_ok=True)
-                    download_file_path.rename(output_file_path)
+                        download_file_path = Path(download_file_path)
+                        try:
+                            _validate_hdf5_file(download_file_path)
+                        except Exception as validation_error:
+                            download_file_path.unlink(missing_ok=True)
+                            if download_exception is None:
+                                download_exception = validation_error
+                            continue
 
-                    output_paths.append(output_file_path)
-                    downloaded_granules.append(granule)
+                        output_file_path = self._download_output_path(granule)
+                        Path(output_file_path).parent.mkdir(parents=True, exist_ok=True)
+                        os.replace(download_file_path, output_file_path)
+
+                        output_paths.append(output_file_path)
+                        downloaded_granules.append(granule)
 
                 if download_exception is not None:
                     last_download_exception = download_exception
@@ -257,9 +281,11 @@ class VIIRS:
                     break
 
             if len(granules_to_download) > 0:
-                raise DownloadFailed("Error when downloading VIIRS files") from last_download_exception
+                raise DownloadFailed(
+                    f"Error when downloading VIIRS files: {last_download_exception}"
+                ) from last_download_exception
         finally:
-            Path(temporary_download_directory).rmdir()
+            shutil.rmtree(temporary_download_directory, ignore_errors=True)
 
         return output_paths
 
