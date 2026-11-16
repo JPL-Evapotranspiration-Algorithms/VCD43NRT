@@ -1,8 +1,10 @@
 import logging
+import os
+import uuid
 import warnings
 from datetime import datetime
 from os import remove
-from os.path import abspath, exists, expanduser, join
+from os.path import abspath, dirname, exists, expanduser, join
 from pathlib import Path
 
 import h5py
@@ -25,6 +27,23 @@ NDVI_COLORMAP = LinearSegmentedColormap.from_list(
     colors=["#0000ff", "#000000", "#745d1a", "#e1dea2", "#45ff01", "#325e32"],
 )
 ALBEDO_COLORMAP = "gray"
+
+
+def _atomic_write_geotiff(image: Raster, filename: str, use_cog: bool = False) -> None:
+    os.makedirs(dirname(abspath(filename)), exist_ok=True)
+    temp_filename = f"{filename}.{os.getpid()}.{uuid.uuid4().hex}.tmp.tif"
+    try:
+        if use_cog:
+            image.to_COG(temp_filename)
+        else:
+            image.to_geotiff(temp_filename)
+        os.replace(temp_filename, filename)
+    finally:
+        if exists(temp_filename):
+            try:
+                remove(temp_filename)
+            except OSError:
+                pass
 
 
 class VIIRSGranule:
@@ -217,7 +236,10 @@ class VIIRSGranule:
             except Exception as e:
                 logger.exception(e)
                 logger.warning(f"removing corrupted file: {product_filename}")
-                remove(product_filename)
+                try:
+                    remove(product_filename)
+                except OSError:
+                    pass
                 image = None
 
         if image is None:
@@ -236,7 +258,7 @@ class VIIRSGranule:
 
         if save_data and not exists(product_filename):
             logger.info(f"writing {self.PRODUCT_SHORT_NAME} {product_name}: {cl.file(product_filename)} {cl.val(image.shape)}")
-            image.to_geotiff(product_filename)
+            _atomic_write_geotiff(image, product_filename)
 
             if save_preview:
                 image.percentilecut.to_geojpeg(product_filename.replace(".tif", ".jpeg"), quality=20, remove_XML=True)
@@ -468,11 +490,13 @@ class VIIRSGranule:
         else:
             red = self.get_red(cloud_mask, apply_cloud_mask, geometry, save_data, save_preview)
             nir = self.get_NIR(cloud_mask, apply_cloud_mask, geometry, save_data, save_preview)
-            ndvi = np.clip((nir - red) / (nir + red), -1, 1)
+            denominator = nir + red
+            raw_ndvi = np.where(denominator == 0, np.nan, (nir - red) / denominator)
+            ndvi = Raster(np.clip(raw_ndvi, -1, 1), geometry=nir.geometry)
 
         if save_data and not exists(product_filename):
             logger.info(f"writing {self.PRODUCT_SHORT_NAME} NDVI: {cl.file(product_filename)}")
-            ndvi.to_geotiff(product_filename)
+            _atomic_write_geotiff(ndvi, product_filename)
 
             if save_preview:
                 ndvi.percentilecut.to_geojpeg(product_filename.replace(".tif", ".jpeg"))
@@ -527,7 +551,7 @@ class VIIRSGranule:
 
         if save_data and not exists(product_filename):
             logger.info(f"writing {self.PRODUCT_SHORT_NAME} albedo: {cl.file(product_filename)}")
-            albedo.to_geotiff(product_filename)
+            _atomic_write_geotiff(albedo, product_filename)
 
         if geometry is not None:
             logger.info(f"projecting {self.PRODUCT_SHORT_NAME} albedo from {cl.val(albedo.geometry.cell_size)} to {cl.val(geometry.cell_size)}")

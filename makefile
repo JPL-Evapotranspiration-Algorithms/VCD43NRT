@@ -113,3 +113,6 @@ wheel-test:
 	/tmp/vcd43nrt_wheel_verify/bin/pip install dist/*.whl
 	cd /tmp && /tmp/vcd43nrt_wheel_verify/bin/python -I -m VCD43NRT.smoke_test
 	rm -rf /tmp/vcd43nrt_wheel_verify
+
+repomix:
+	npx repomix --ignore "**/*.lock,**/*.md,**/*.txt"
