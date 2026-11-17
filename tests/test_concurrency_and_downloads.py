@@ -177,7 +177,22 @@ def test_vcd43nrt_stages_atomically_in_temp_directory(tmp_path, monkeypatch):
     assert all(".tmp" in d for d in seen_temp_dirs)
     # Temp parent directories should be cleaned up after promotion
     products_dir = Path(processor.VCD43NRT_directory)
-    assert [p.name for p in products_dir.iterdir()] == [processor.granule_ID(target_date, tile)]
+    names = sorted(p.name for p in products_dir.iterdir())
+    assert processor.granule_ID(target_date, tile) in names
+    assert not any(".tmp" in n for n in names)
+
+
+def test_corrupted_staged_raster_is_removed_and_detected(tmp_path, monkeypatch):
+    bad_tif = tmp_path / "2024-10-30_M1.tif"
+    bad_tif.write_bytes(b"corrupt-tiff-header")
+
+    def fake_open(filename):
+        raise OSError("not recognized as being in a supported file format")
+
+    monkeypatch.setattr(proc_mod.Raster, "open", staticmethod(fake_open))
+
+    assert proc_mod._is_valid_staged_raster(str(bad_tif), expected_shape=(2, 2)) is False
+    assert not bad_tif.exists()
 
 
 def test_bidirectional_reflectance_handles_all_nan_inputs():

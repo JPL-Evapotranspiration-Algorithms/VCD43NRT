@@ -13,10 +13,12 @@ def test_query_date_boundaries(value):
 
 
 class FakeQuery:
-    def __init__(self, granules=None, error=None):
+    def __init__(self, granules=None, error=None, fail_attempts: int = 0):
         self.calls = []
         self.granules = granules
         self.error = error
+        self.fail_attempts = fail_attempts
+        self.get_calls = 0
 
     def __getattr__(self, name):
         def record(*args):
@@ -25,7 +27,8 @@ class FakeQuery:
         return record
 
     def get(self):
-        if self.error is not None:
+        self.get_calls += 1
+        if self.error is not None and (self.fail_attempts == 0 or self.get_calls <= self.fail_attempts):
             raise self.error
         return self.granules
 
@@ -65,8 +68,36 @@ def test_query_filters_and_sorts_granules(monkeypatch, mission, env, override, e
     )
 
 
-def test_query_reports_cmr_failure(monkeypatch):
+def test_query_retries_transient_cmr_errors_and_succeeds(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(VIIRS_query.time, "sleep", lambda s: sleeps.append(s))
+    expected_granules = [granule("2026-10-01T00:00:00Z", "ok")]
+    query = FakeQuery(
+        granules=expected_granules,
+        error=RuntimeError('{"errors":["An Internal Error has occurred."]}'),
+        fail_attempts=2,
+    )
+    monkeypatch.setattr(VIIRS_query.earthaccess, "granule_query", lambda: query)
+
+    result = VIIRS_query.VIIRS_CMR_query(
+        "2026-10-01",
+        "2026-10-02",
+        "SNPP",
+        retries=3,
+        backoff_seconds=1.0,
+    )
+
+    assert result == expected_granules
+    assert query.get_calls == 3
+    assert len(sleeps) == 2
+
+
+def test_query_reports_cmr_failure_after_exhausting_retries(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(VIIRS_query.time, "sleep", lambda s: sleeps.append(s))
     query = FakeQuery(error=RuntimeError("network failed"))
     monkeypatch.setattr(VIIRS_query.earthaccess, "granule_query", lambda: query)
     with pytest.raises(CMRServerUnreachable, match="network failed"):
-        VIIRS_query.VIIRS_CMR_query("2026-10-01", "2026-10-02", "SNPP")
+        VIIRS_query.VIIRS_CMR_query("2026-10-01", "2026-10-02", "SNPP", retries=3, backoff_seconds=1.0)
+    assert query.get_calls == 3
+    assert len(sleeps) == 2
