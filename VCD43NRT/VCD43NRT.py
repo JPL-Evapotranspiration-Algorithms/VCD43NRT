@@ -43,6 +43,7 @@ import warnings
 import dateutil
 import numpy as np
 from dateutil import parser
+from filelock import SoftFileLock
 from matplotlib.colors import Colormap
 from pytictoc import TicToc
 
@@ -154,6 +155,23 @@ class BRDFParameters:
         self.count = count
 
 
+def _is_valid_staged_raster(filename: str, expected_shape: tuple[int, ...] = None) -> bool:
+    if not exists(filename):
+        return False
+    try:
+        raster = Raster.open(filename)
+        if expected_shape is not None and raster.shape != expected_shape:
+            return False
+        return True
+    except Exception as exc:
+        logger.warning(f"removing corrupted staged raster {filename}: {exc}")
+        try:
+            os.remove(filename)
+        except OSError:
+            pass
+        return False
+
+
 def _read_brdf_stack(directory: str, dates: Sequence[date], variable: str, shape: tuple[int, ...]) -> np.ndarray:
     """
     Read a time series of raster files into a 2D array (pixels × time).
@@ -164,7 +182,15 @@ def _read_brdf_stack(directory: str, dates: Sequence[date], variable: str, shape
         filename = join(directory, f"{processing_date:%Y-%m-%d}_{variable}.tif")
         if not exists(filename):
             raise FileNotFoundError(f"missing staged {variable} raster for {processing_date}: {filename}")
-        values = np.asarray(Raster.open(filename), dtype=np.float64)
+        try:
+            values = np.asarray(Raster.open(filename), dtype=np.float64)
+        except Exception as exc:
+            logger.warning(f"removing corrupted staged {variable} raster for {processing_date}: {filename} ({exc})")
+            try:
+                os.remove(filename)
+            except OSError:
+                pass
+            raise FileNotFoundError(f"corrupted staged {variable} raster removed for {processing_date}: {filename}") from exc
         if values.shape != shape:
             raise ValueError(
                 f"staged {variable} raster for {processing_date} has shape {values.shape}; expected {shape}"
@@ -438,6 +464,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
 
         granule = self.VNP09GA(date_UTC, tile)
         geometry = granule.geometry(band)
+        shape = geometry.shape
         observation_dates = []
 
         for processing_date in [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]:
@@ -449,7 +476,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
                 # Stage reflectance data
                 reflectance_filename = self.generate_staging_filename(tile, processing_date, band)
 
-                if exists(reflectance_filename):
+                if _is_valid_staged_raster(reflectance_filename, expected_shape=shape):
                     logger.info(f"previously generated {band} reflectance on {processing_date}: {reflectance_filename}")
                 else:
                     logger.info(f"generating {band} reflectance on {processing_date}")
@@ -460,7 +487,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
                 # Stage solar zenith angle data
                 solar_zenith_filename = self.generate_staging_filename(tile, processing_date, f"{band_type}_solar_zenith")
 
-                if exists(solar_zenith_filename):
+                if _is_valid_staged_raster(solar_zenith_filename, expected_shape=shape):
                     logger.info(f"previously generated solar zenith on {processing_date}: {solar_zenith_filename}")
                 else:
                     logger.info(f"generating solar zenith on {processing_date}")
@@ -471,7 +498,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
                 # Stage sensor (view) zenith angle data
                 sensor_zenith_filename = self.generate_staging_filename(tile, processing_date, f"{band_type}_sensor_zenith")
 
-                if exists(sensor_zenith_filename):
+                if _is_valid_staged_raster(sensor_zenith_filename, expected_shape=shape):
                     logger.info(f"previously generated sensor zenith on {processing_date}: {sensor_zenith_filename}")
                 else:
                     logger.info(f"generating sensor zenith on {processing_date}")
@@ -482,7 +509,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
                 # Stage relative azimuth angle (difference between solar and view azimuth)
                 relative_azimuth_filename = self.generate_staging_filename(tile, processing_date, f"{band_type}_relative_azimuth")
 
-                if exists(relative_azimuth_filename):
+                if _is_valid_staged_raster(relative_azimuth_filename, expected_shape=shape):
                     logger.info(f"previously generated relative azimuth on {processing_date}: {relative_azimuth_filename}")
                 else:
                     logger.info(f"generating relative azimuth on {processing_date}")
@@ -504,7 +531,7 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         # Calculate solar noon zenith angle for BRDF nadir normalization
         SZA_filename = self.generate_staging_filename(tile, date_UTC, f"{band_type}_solar_zenith_noon")
 
-        if exists(SZA_filename):
+        if _is_valid_staged_raster(SZA_filename, expected_shape=shape):
             logger.info(f"solar zenith noon file already exists: {SZA_filename}")
         else:
             doy = date_UTC.timetuple().tm_yday
@@ -518,7 +545,6 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
         if not observation_dates:
             raise BRDFRetrievalFailed(f"no reflectance/angle observations available for {tile} on {date_UTC}")
 
-        shape = geometry.shape
         reflectance_directory = self.generate_staging_directory(tile, band)
         solar_zenith_directory = self.generate_staging_directory(tile, f"{band_type}_solar_zenith")
         sensor_zenith_directory = self.generate_staging_directory(tile, f"{band_type}_sensor_zenith")
@@ -721,7 +747,18 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
                     staging_granule.add_layer(f"count_M{m}", BRDF_parameters.count)
 
             # Compute broadband shortwave albedo (0.3-3.0 μm)
-            albedo = 0.2418 * b[1]                      - 0.201 * b[2]                      + 0.2093 * b[3]                      + 0.1146 * b[4]                      + 0.1348 * b[5]                      + 0.2251 * b[7]                      + 0.1123 * b[8]                      + 0.0860 * b[10]                      + 0.0803 * b[11]                      - 0.0131
+            albedo = (
+                0.2418 * b[1]
+                - 0.201 * b[2]
+                + 0.2093 * b[3]
+                + 0.1146 * b[4]
+                + 0.1348 * b[5]
+                + 0.2251 * b[7]
+                + 0.1123 * b[8]
+                + 0.0860 * b[10]
+                + 0.0803 * b[11]
+                - 0.0131
+            )
 
             albedo = Raster(rasters.clip(albedo, 0, 1), geometry=b[1].geometry)
             staging_granule.add_layer("albedo", albedo)
@@ -729,20 +766,17 @@ class VCD43NRT(VIIRSDownloaderAlbedo, VIIRSDownloaderNDVI):
             if not staging_granule.complete:
                 raise BRDFRetrievalFailed(f"staged VCD43NRT granule is incomplete: {temp_directory}")
 
-            if granule.complete:
-                logger.info(f"peer worker completed VCD43NRT granule concurrently: {directory}")
-                return granule
-
-            if exists(directory):
-                logger.warning(f"removing incomplete VCD43NRT granule output directory before promotion: {directory}")
-                shutil.rmtree(directory, ignore_errors=True)
-
-            try:
-                os.replace(temp_directory, directory)
-            except OSError:
+            lock_path = f"{directory}.lock"
+            with SoftFileLock(lock_path, timeout=60):
                 if granule.complete:
+                    logger.info(f"peer worker completed VCD43NRT granule concurrently: {directory}")
                     return granule
-                raise
+
+                if exists(directory):
+                    logger.warning(f"removing incomplete VCD43NRT granule output directory before promotion: {directory}")
+                    shutil.rmtree(directory, ignore_errors=True)
+
+                os.replace(temp_directory, directory)
         finally:
             shutil.rmtree(temp_parent, ignore_errors=True)
 
